@@ -140,3 +140,12 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Ajout d’une icône de compte dans l’en-tête desktop.
 - Accès au statut de synchronisation, à la synchronisation manuelle et à la déconnexion.
 - Le menu burger mobile reste inchangé.
+
+
+## Version 1.9
+- Icône de compte remplacée par un pictogramme de personnage.
+- Menus saison et compte harmonisés visuellement.
+- Suppression des textes sur le mélange automatique des albums et catégories.
+- Bouton Accueil et croix de sortie alignés.
+- Ajout d’un indicateur de chargement animé pour Quiz, Guess et la recherche d’extrait audio.
+- Nouveau libellé : « Quelle est ta gamme colorée préférée, Aliénor ? »

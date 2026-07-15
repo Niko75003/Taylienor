@@ -9,9 +9,9 @@
 <button id="burgerBtn" class="burger-btn" aria-label="Ouvrir le menu" aria-expanded="false"><span></span><span></span><span></span></button>
 <button class="brand" data-route="home"><span class="brand-taylor">Taylor</span><small>ALIÉNOR’S SWIFTIE EXPERIENCE</small></button>
 <nav><button data-route="home">Accueil</button><button data-route="rank">Rank</button><button data-route="blindtest">Blindtest</button><button data-route="quiz">Quiz</button></nav>
-<button id="themeBtn" class="theme-menu-dot" aria-label="Changer la saison" title="Changer la saison"><span></span></button>
+<button id="themeBtn" class="top-icon-btn theme-menu-dot" aria-label="Changer la saison" title="Changer la saison"><span></span></button>
 <div class="account-menu-wrap">
-  <button id="accountBtn" class="account-btn" aria-label="Ouvrir le menu du compte" aria-expanded="false" title="Compte">◯</button>
+  <button id="accountBtn" class="top-icon-btn" aria-label="Ouvrir le menu du compte" aria-expanded="false" title="Compte"><span class="person-icon" aria-hidden="true"></span></button>
   <div id="accountMenu" class="account-menu" hidden>
     <p id="desktopAccountEmail" class="account-email"></p>
     <p id="desktopSyncStatus" class="account-status">Synchronisation inactive</p>
@@ -40,7 +40,7 @@
   </div><div class="mobile-sync"><p id="syncStatus">Synchronisation inactive</p><button id="syncNowBtn">Synchroniser maintenant</button><button id="logoutBtn">Se déconnecter</button></div></aside>
 
     <main id="app"></main><div id="authSplash" class="auth-splash" hidden><section class="auth-card"><div class="auth-mark">Taylor</div><p class="eyebrow">Aliénor’s Swiftie Experience</p><h1>Bienvenue, Aliénor ♡</h1><form id="loginForm"><label>Adresse e-mail<input id="loginEmail" type="email" autocomplete="email" required></label><label>Mot de passe<input id="loginPassword" type="password" autocomplete="current-password" required></label><button class="primary" type="submit">Se connecter</button><button class="auth-link" type="button" id="forgotPassword">Mot de passe oublié</button><p id="authMessage" class="auth-message" aria-live="polite"></p></form></section></div>
-<dialog id="themeDialog"><button class="close">×</button><h2>Quelle est ton humeur, Aliénor ?</h2>
+<dialog id="themeDialog" class="top-popover"><button class="close">×</button><h2>Quelle est ta gamme colorée préférée, Aliénor ?</h2>
 <div class="themes"><button data-theme="soft-summer">Été</button><button data-theme="soft-autumn">Automne</button><button data-theme="winter">Hiver</button><button data-theme="spring">Printemps</button></div></dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="data.js"></script><script src="quiz-data.js"></script><script src="app.js"></script>
