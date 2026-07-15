@@ -115,3 +115,17 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Connexion e-mail/mot de passe au premier lancement.
 - Synchronisation des notes, meilleurs scores, thème et préférences entre appareils.
 - Sauvegarde locale maintenue en parallèle.
+
+
+## Version 1.5
+- Les quatre critères sont désormais additionnés : la note d’un morceau est affichée sur 20.
+- Le classement général trie la note totale sur 20.
+- Le blindtest accepte davantage de fautes de frappe grâce à une comparaison approximative.
+- Les accents, apostrophes, ponctuations, espaces et la mention « Taylor’s Version » sont ignorés.
+- Une réponse partielle ou légèrement mal orthographiée peut être acceptée lorsque la similarité reste suffisante.
+
+
+## Version 1.6
+- Une réponse de blindtest est également acceptée si elle contient au moins trois mots significatifs du titre.
+- Ces trois mots peuvent comporter de petites fautes d’orthographe.
+- Les mots très courts et les mots-outils fréquents ne comptent pas dans cette règle.

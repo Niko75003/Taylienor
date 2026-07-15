@@ -119,16 +119,16 @@ function album(){
     </div>
     <div class="tracks">
       <div class="track head">
-        <span>#</span><span>Titre</span><span>Reliability</span><span>Lyrics</span><span>Voice</span><span>Production</span><span>Moy.</span>
+        <span>#</span><span>Titre</span><span>Reliability</span><span>Lyrics</span><span>Voice</span><span>Production</span><span>Total</span>
       </div>
       ${a.tracks.map((t,i)=>{
-        const k=a.id+'|'+t,r=ratings[k]||[0,0,0,0],avg=r.some(Boolean)?(r.reduce((x,y)=>x+y,0)/4).toFixed(1):'—';
+        const k=a.id+'|'+t,r=ratings[k]||[0,0,0,0],avg=r.some(Boolean)?r.reduce((x,y)=>x+y,0):'—';
         const isOpen=state.openTrack===k;
         return `<article class="track-mobile-card ${isOpen?'open':''}">
           <button class="track-mobile-summary" data-toggle-track="${k}" aria-expanded="${isOpen}">
             <span class="track-number">${i+1}</span>
             <b>${t}</b>
-            <strong>${avg}${avg==='—'?'':'/5'}</strong>
+            <strong>${avg}${avg==='—'?'':'/20'}</strong>
             <span class="track-chevron">⌄</span>
           </button>
           <div class="track-mobile-votes">
@@ -137,7 +137,7 @@ function album(){
           </div>
         </article>
         <div class="track desktop-track">
-          <span>${i+1}</span><b>${t}</b>${r.map((v,c)=>dots(k,c,v)).join('')}<strong>${avg}</strong>
+          <span>${i+1}</span><b>${t}</b>${r.map((v,c)=>dots(k,c,v)).join('')}<strong>${avg}${avg==='—'?'':'/20'}</strong>
         </div>`
       }).join('')}
     </div>
@@ -147,7 +147,7 @@ function ranking(){
   let rows=[];
   for(const a of ALBUMS)for(const t of a.tracks){
     let r=ratings[a.id+'|'+t];
-    if(r&&r.some(Boolean))rows.push({t,a:a.title,albumId:a.id,r,avg:r.reduce((x,y)=>x+y,0)/4});
+    if(r&&r.some(Boolean))rows.push({t,a:a.title,albumId:a.id,r,avg:r.reduce((x,y)=>x+y,0)});
   }
   if(state.rankAlbum!=='all') rows=rows.filter(x=>x.albumId===state.rankAlbum);
   const sortIndex={reliability:0,lyrics:1,voice:2,production:3};
@@ -156,7 +156,7 @@ function ranking(){
     let yv=state.rankSort==='avg'?y.avg:y.r[sortIndex[state.rankSort]];
     return state.rankDir==='asc'?xv-yv:yv-xv;
   });
-  const sortLabels={avg:'Note générale',reliability:'Reliability',lyrics:'Lyrics',voice:'Voice',production:'Production'};
+  const sortLabels={avg:'Note totale',reliability:'Reliability',lyrics:'Lyrics',voice:'Voice',production:'Production'};
   return head('Le grand classement','Tous les morceaux évalués par Aliénor.')+`
   <div class="ranking-view-switch" role="group" aria-label="Affichage du classement">
     <button class="${state.rankingView==='simple'?'active':''}" data-ranking-view="simple">Version simplifiée</button>
@@ -188,11 +188,11 @@ function ranking(){
     <div class="ranking-table ${state.rankingView==='simple'?'simple-view':'detailed-view'}">
       <div class="rankrow rankhead">
         <span>#</span><span>Titre</span><span>Album</span>
-        <span class="detail-col">Reliability</span><span class="detail-col">Lyrics</span><span class="detail-col">Voice</span><span class="detail-col">Production</span><span>Note</span>
+        <span class="detail-col">Reliability</span><span class="detail-col">Lyrics</span><span class="detail-col">Voice</span><span class="detail-col">Production</span><span>Note /20</span>
       </div>
       ${rows.length?rows.map((x,i)=>`<div class="rankrow">
         <b>${i+1}</b><span>${x.t}</span><small>${x.a}</small>
-        ${x.r.map(v=>`<span class="detail-col">${v}/5</span>`).join('')}<b>${x.avg.toFixed(1)}/5</b>
+        ${x.r.map(v=>`<span class="detail-col">${v}/5</span>`).join('')}<b>${x.avg}/20</b>
       </div>`).join(''):'<p>Aucun morceau évalué pour ce filtre.</p>'}
     </div>
   </section>`
@@ -313,7 +313,76 @@ if(viewBtn){
   render();
   return;
 }
-let b=e.target.closest('[data-rate]');if(b){let k=b.dataset.rate,c=+b.dataset.crit,v=+b.dataset.value;ratings[k]=ratings[k]||[0,0,0,0];ratings[k][c]=v;save();render()}if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();if(e.target.matches('.play')&&state.game.audio){state.game.audio.currentTime=state.level==='hard'?8:state.level==='easy'?0:4;state.game.audio.play();setTimeout(()=>state.game.audio.pause(),state.level==='hard'?5000:state.level==='easy'?15000:10000)}if(e.target.dataset.answer!==undefined){let g=state.game,q=g.items[g.i];if(+e.target.dataset.answer===q.a)g.score++;g.i++;render()}if(e.target.hasAttribute('data-submit-blind')){let g=state.game,item=g.items[g.i],norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]/g,'');let pts=0;if(norm($('#song').value)===norm(item.title))pts+=2;if(norm($('#alb').value)&&norm(item.album).includes(norm($('#alb').value)))pts++;if(+$('#track').value===item.track)pts++;g.score+=pts;g.i++;g.audio?.pause();g.audio=null;render();if(g.i<g.items.length)loadAudio()}})
+let b=e.target.closest('[data-rate]');if(b){let k=b.dataset.rate,c=+b.dataset.crit,v=+b.dataset.value;ratings[k]=ratings[k]||[0,0,0,0];ratings[k][c]=v;save();render()}if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();if(e.target.matches('.play')&&state.game.audio){state.game.audio.currentTime=state.level==='hard'?8:state.level==='easy'?0:4;state.game.audio.play();setTimeout(()=>state.game.audio.pause(),state.level==='hard'?5000:state.level==='easy'?15000:10000)}if(e.target.dataset.answer!==undefined){let g=state.game,q=g.items[g.i];if(+e.target.dataset.answer===q.a)g.score++;g.i++;render()}if(e.target.hasAttribute('data-submit-blind')){
+  let g=state.game,item=g.items[g.i];
+  const normalize=s=>(s||'')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\(taylor.?s version\)/g,'')
+    .replace(/\bthe\b/g,'')
+    .replace(/&/g,'and')
+    .replace(/[^a-z0-9]/g,'');
+  const levenshtein=(a,b)=>{
+    if(!a.length)return b.length;if(!b.length)return a.length;
+    const row=Array.from({length:b.length+1},(_,i)=>i);
+    for(let i=1;i<=a.length;i++){
+      let prev=row[0];row[0]=i;
+      for(let j=1;j<=b.length;j++){
+        const tmp=row[j];
+        row[j]=Math.min(row[j]+1,row[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));
+        prev=tmp;
+      }
+    }
+    return row[b.length];
+  };
+  const similarity=(a,b)=>{
+    a=normalize(a);b=normalize(b);
+    if(!a||!b)return 0;
+    if(a===b)return 1;
+    if(a.includes(b)||b.includes(a))return Math.min(a.length,b.length)/Math.max(a.length,b.length)+0.15;
+    return 1-levenshtein(a,b)/Math.max(a.length,b.length);
+  };
+  const significantWords=s=>(s||'')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\(taylor.?s version\)/g,'')
+    .replace(/[^a-z0-9\s]/g,' ')
+    .split(/\s+/)
+    .filter(w=>w.length>=3 && !['the','and','for','with','from','this','that','you','your','are','was','were','its','into','out','too'].includes(w));
+  const hasThreeCloseWords=(input,target)=>{
+    const inputWords=significantWords(input);
+    const targetWords=significantWords(target);
+    if(inputWords.length<3 || targetWords.length<3) return false;
+    let matched=0;
+    const used=new Set();
+    for(const tw of targetWords){
+      let bestIndex=-1,bestScore=0;
+      inputWords.forEach((iw,idx)=>{
+        if(used.has(idx)) return;
+        const score=similarity(iw,tw);
+        if(score>bestScore){bestScore=score;bestIndex=idx}
+      });
+      if(bestScore>=0.72 && bestIndex>=0){
+        matched++;
+        used.add(bestIndex);
+      }
+      if(matched>=3) return true;
+    }
+    return false;
+  };
+  const songInput=$('#song').value;
+  const albumInput=$('#alb').value;
+  let pts=0;
+  if(similarity(songInput,item.title)>=0.68 || hasThreeCloseWords(songInput,item.title))pts+=2;
+  if(similarity(albumInput,item.album)>=0.58)pts++;
+  if(String($('#track').value).trim()!=='' && Math.abs(+$('#track').value-item.track)<=0)pts++;
+  g.score+=pts;
+  g.i++;
+  g.audio?.pause();
+  g.audio=null;
+  render();
+  if(g.i<g.items.length)loadAudio()
+}})
 
 document.addEventListener('change',e=>{
   if(e.target.id==='rankAlbumFilter'){state.rankAlbum=e.target.value;render()}
