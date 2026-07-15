@@ -93,3 +93,11 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Le cache du catalogue a été versionné pour ne pas réutiliser d’anciennes listes abrégées.
 - Six questions photographiques utilisent maintenant deux images incluses dans l’archive.
 - Pour une partie de 5 questions ou plus, au moins une question photo est systématiquement intégrée.
+
+
+## Version 1.2 — optimisation mobile
+- Dans un album, un toucher sur le titre d’une chanson déplie les quatre critères de notation.
+- Une seule chanson peut rester ouverte à la fois ; la ligne se replie en la touchant à nouveau.
+- Le classement général propose une vue simplifiée (#, chanson, album, note) adaptée à la largeur mobile.
+- Un sélecteur sticky permet de basculer vers la vue détaillée avec les quatre critères.
+- Le choix de vue est conservé pendant la navigation de la session.

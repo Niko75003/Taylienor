@@ -1,5 +1,5 @@
 const $=s=>document.querySelector(s), app=$('#app');
-const state={route:'home',album:null,count:10,level:'normal',game:null,rankSort:'avg',rankDir:'desc',rankAlbum:'all'};
+const state={route:'home',album:null,count:10,level:'normal',game:null,rankSort:'avg',rankDir:'desc',rankAlbum:'all',rankingView:'simple',openTrack:null};
 const ratings=JSON.parse(localStorage.getItem('alienor-ratings')||'{}');
 const save=()=>localStorage.setItem('alienor-ratings',JSON.stringify(ratings));
 const allTracks=()=>ALBUMS.flatMap(a=>a.tracks.map((t,i)=>({title:t,album:a.title,albumId:a.id,track:i+1})));
@@ -60,7 +60,44 @@ function home(){return `<section class="hero"><h1><small>Welcome</small>Aliénor
 </div></section>`}
 function rank(){return head('Rank','Les Taylor’s Versions remplacent les versions originales lorsqu’elles existent.')+`<div style="margin-bottom:24px"><button class="primary" data-route="ranking">Voir le classement général</button></div><section class="album-grid">${ALBUMS.map(a=>`<button class="album" data-route="album" data-album="${a.id}" data-title="${a.title}" style="--a:${a.a};--b:${a.b}"><div class="cover"><span class="cover-label">${a.title}</span></div><div class="meta"><b>${a.title}</b><br><small>${a.year} · ${a.version}</small></div></button>`).join('')}</section>`}
 function dots(key,crit,val){return `<span class="dots">${[1,2,3,4,5].map(n=>`<button class="dot ${n<=val?'on':''}" data-rate="${key}" data-crit="${crit}" data-value="${n}" aria-label="${n}/5"></button>`).join('')}</span>`}
-function album(){const a=ALBUMS.find(x=>x.id===state.album)||ALBUMS[0];return head(a.title,`${a.year} · ${a.version}`,'rank','Tous les albums')+`<section class="panel rating-layout"><div><div class="big-cover" data-title="${a.title}" style="--a:${a.a};--b:${a.b}"><span class="cover-label">${a.title}</span></div><div class="album-actions"><button class="danger" data-reset-album="${a.id}">Réinitialiser la notation</button></div></div><div class="tracks"><div class="track head"><span>#</span><span>Titre</span><span>Reliability</span><span>Lyrics</span><span>Voice</span><span>Production</span><span>Moy.</span></div>${a.tracks.map((t,i)=>{let k=a.id+'|'+t,r=ratings[k]||[0,0,0,0],avg=r.some(Boolean)?(r.reduce((x,y)=>x+y,0)/4).toFixed(1):'—';return `<div class="track"><span>${i+1}</span><b>${t}</b>${r.map((v,c)=>dots(k,c,v)).join('')}<strong>${avg}</strong></div>`}).join('')}</div></section>`}
+function album(){
+  const a=ALBUMS.find(x=>x.id===state.album)||ALBUMS[0];
+  return head(a.title,`${a.year} · ${a.version}`,'rank','Tous les albums')+
+  `<section class="panel rating-layout">
+    <div>
+      <div class="big-cover" data-title="${a.title}" style="--a:${a.a};--b:${a.b}">
+        <span class="cover-label">${a.title}</span>
+      </div>
+      <div class="album-actions">
+        <button class="danger" data-reset-album="${a.id}">Réinitialiser la notation</button>
+      </div>
+    </div>
+    <div class="tracks">
+      <div class="track head">
+        <span>#</span><span>Titre</span><span>Reliability</span><span>Lyrics</span><span>Voice</span><span>Production</span><span>Moy.</span>
+      </div>
+      ${a.tracks.map((t,i)=>{
+        const k=a.id+'|'+t,r=ratings[k]||[0,0,0,0],avg=r.some(Boolean)?(r.reduce((x,y)=>x+y,0)/4).toFixed(1):'—';
+        const isOpen=state.openTrack===k;
+        return `<article class="track-mobile-card ${isOpen?'open':''}">
+          <button class="track-mobile-summary" data-toggle-track="${k}" aria-expanded="${isOpen}">
+            <span class="track-number">${i+1}</span>
+            <b>${t}</b>
+            <strong>${avg}${avg==='—'?'':'/5'}</strong>
+            <span class="track-chevron">⌄</span>
+          </button>
+          <div class="track-mobile-votes">
+            ${['Reliability','Lyrics','Voice','Production'].map((label,c)=>`
+              <div class="mobile-criterion"><span>${label}</span>${dots(k,c,r[c])}</div>`).join('')}
+          </div>
+        </article>
+        <div class="track desktop-track">
+          <span>${i+1}</span><b>${t}</b>${r.map((v,c)=>dots(k,c,v)).join('')}<strong>${avg}</strong>
+        </div>`
+      }).join('')}
+    </div>
+  </section>`
+}
 function ranking(){
   let rows=[];
   for(const a of ALBUMS)for(const t of a.tracks){
@@ -76,7 +113,11 @@ function ranking(){
   });
   const sortLabels={avg:'Note générale',reliability:'Reliability',lyrics:'Lyrics',voice:'Voice',production:'Production'};
   return head('Le grand classement','Tous les morceaux évalués par Aliénor.')+`
-  <section class="panel">
+  <div class="ranking-view-switch" role="group" aria-label="Affichage du classement">
+    <button class="${state.rankingView==='simple'?'active':''}" data-ranking-view="simple">Version simplifiée</button>
+    <button class="${state.rankingView==='detailed'?'active':''}" data-ranking-view="detailed">Voir le détail des notes</button>
+  </div>
+  <section class="panel ranking-panel">
     <div class="ranking-toolbar">
       <label>Filtrer par album
         <select id="rankAlbumFilter">
@@ -99,14 +140,14 @@ function ranking(){
         <button class="danger" data-reset-all-rankings>Réinitialiser tous les classements</button>
       </div>
     </div>
-    <div class="ranking-table">
+    <div class="ranking-table ${state.rankingView==='simple'?'simple-view':'detailed-view'}">
       <div class="rankrow rankhead">
         <span>#</span><span>Titre</span><span>Album</span>
-        <span>Reliability</span><span>Lyrics</span><span>Voice</span><span>Production</span><span>Note générale</span>
+        <span class="detail-col">Reliability</span><span class="detail-col">Lyrics</span><span class="detail-col">Voice</span><span class="detail-col">Production</span><span>Note</span>
       </div>
       ${rows.length?rows.map((x,i)=>`<div class="rankrow">
         <b>${i+1}</b><span>${x.t}</span><small>${x.a}</small>
-        ${x.r.map(v=>`<span>${v}/5</span>`).join('')}<b>${x.avg.toFixed(1)}/5</b>
+        ${x.r.map(v=>`<span class="detail-col">${v}/5</span>`).join('')}<b>${x.avg.toFixed(1)}/5</b>
       </div>`).join(''):'<p>Aucun morceau évalué pour ce filtre.</p>'}
     </div>
   </section>`
@@ -211,6 +252,18 @@ if(resetBtn){
     save();
     render();
   }
+  return;
+}
+const trackToggle=e.target.closest('[data-toggle-track]');
+if(trackToggle){
+  state.openTrack=state.openTrack===trackToggle.dataset.toggleTrack?null:trackToggle.dataset.toggleTrack;
+  render();
+  return;
+}
+const viewBtn=e.target.closest('[data-ranking-view]');
+if(viewBtn){
+  state.rankingView=viewBtn.dataset.rankingView;
+  render();
   return;
 }
 let b=e.target.closest('[data-rate]');if(b){let k=b.dataset.rate,c=+b.dataset.crit,v=+b.dataset.value;ratings[k]=ratings[k]||[0,0,0,0];ratings[k][c]=v;save();render()}if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();if(e.target.matches('.play')&&state.game.audio){state.game.audio.currentTime=state.level==='hard'?8:state.level==='easy'?0:4;state.game.audio.play();setTimeout(()=>state.game.audio.pause(),state.level==='hard'?5000:state.level==='easy'?15000:10000)}if(e.target.dataset.answer!==undefined){let g=state.game,q=g.items[g.i];if(+e.target.dataset.answer===q.a)g.score++;g.i++;render()}if(e.target.hasAttribute('data-submit-blind')){let g=state.game,item=g.items[g.i],norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]/g,'');let pts=0;if(norm($('#song').value)===norm(item.title))pts+=2;if(norm($('#alb').value)&&norm(item.album).includes(norm($('#alb').value)))pts++;if(+$('#track').value===item.track)pts++;g.score+=pts;g.i++;g.audio?.pause();g.audio=null;render();if(g.i<g.items.length)loadAudio()}})
