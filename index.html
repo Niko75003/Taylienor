@@ -6,13 +6,33 @@
 </head>
 <body>
 <header>
-<button class="brand" data-route="home">Taylor <small>ALIÉNOR’S SWIFTIE EXPERIENCE</small></button>
+<button id="burgerBtn" class="burger-btn" aria-label="Ouvrir le menu" aria-expanded="false"><span></span><span></span><span></span></button>
+<button class="brand" data-route="home"><span class="brand-taylor">Taylor</span><small>ALIÉNOR’S SWIFTIE EXPERIENCE</small></button>
 <nav><button data-route="home">Accueil</button><button data-route="rank">Rank</button><button data-route="blindtest">Blindtest</button><button data-route="quiz">Quiz</button></nav>
-<button id="themeBtn" class="theme-menu-dot" aria-label="Changer le thème" title="Changer le thème"><span></span></button>
+<button id="themeBtn" class="theme-menu-dot" aria-label="Changer la saison" title="Changer la saison"><span></span></button>
 </header>
+<div id="mobileMenuBackdrop" class="mobile-menu-backdrop"></div>
+<aside id="mobileMenu" class="mobile-menu" aria-hidden="true">
+  <div class="mobile-menu-head">
+    <b>Aliénor’s Swiftie Experience</b>
+    <button id="mobileMenuClose" aria-label="Fermer le menu">×</button>
+  </div>
+  <div class="mobile-menu-links">
+    <button data-mobile-route="rank">♡ Rank</button>
+    <button data-mobile-route="blindtest">♫ Guess</button>
+    <button data-mobile-route="quiz">? Quiz</button>
+  </div>
+  <p class="mobile-menu-label">Gamme colorée</p>
+  <div class="mobile-theme-list">
+    <button data-mobile-theme="soft-summer"><span class="summer"></span>Été</button>
+    <button data-mobile-theme="soft-autumn"><span class="autumn"></span>Automne</button>
+    <button data-mobile-theme="winter"><span class="winter"></span>Hiver</button>
+    <button data-mobile-theme="spring"><span class="spring"></span>Printemps</button>
+  </div>
+</aside>
 
     <main id="app"></main>
 <dialog id="themeDialog"><button class="close">×</button><h2>Quelle est ton humeur, Aliénor ?</h2>
-<div class="themes"><button data-theme="soft-summer">Soft Summer</button><button data-theme="soft-autumn">Soft Autumn</button><button data-theme="winter">Winter</button><button data-theme="spring">Spring</button></div></dialog>
+<div class="themes"><button data-theme="soft-summer">Été</button><button data-theme="soft-autumn">Automne</button><button data-theme="winter">Hiver</button><button data-theme="spring">Printemps</button></div></dialog>
 <script src="data.js"></script><script src="quiz-data.js"></script><script src="app.js"></script>
 </body></html>

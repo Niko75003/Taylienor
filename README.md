@@ -101,3 +101,11 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Le classement général propose une vue simplifiée (#, chanson, album, note) adaptée à la largeur mobile.
 - Un sélecteur sticky permet de basculer vers la vue détaillée avec les quatre critères.
 - Le choix de vue est conservé pendant la navigation de la session.
+
+
+## Version 1.3 — navigation mobile
+- L’identité « Aliénor’s Swiftie Experience » reste visible dans l’en-tête mobile.
+- Ajout d’un menu burger à gauche avec Rank, Guess et Quiz.
+- Le menu contient également le choix de la gamme colorée.
+- Les palettes sont renommées Été, Automne, Hiver et Printemps sur mobile et ordinateur.
+- La pastille de saison reste accessible à droite de l’en-tête.

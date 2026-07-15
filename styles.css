@@ -120,3 +120,38 @@ html[data-theme="spring"] .theme-menu-dot span{background:linear-gradient(135deg
   .ranking-table.detailed-view .rankrow{min-width:880px;grid-template-columns:55px 190px 150px repeat(5,90px)}
   .ranking-table.detailed-view .rankhead{position:sticky;top:139px}
 }
+
+/* Version 1.3 — header mobile, burger et saisons */
+.burger-btn{display:none;width:38px;height:38px;padding:8px;border:0;background:transparent;border-radius:50%}
+.burger-btn span{display:block;height:2px;margin:4px 0;background:var(--text);border-radius:2px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-taylor{font:34px Parisienne}
+.mobile-menu,.mobile-menu-backdrop{display:none}
+.mobile-menu-backdrop{position:fixed;inset:0;z-index:40;background:#09071399;backdrop-filter:blur(4px)}
+.mobile-menu{position:fixed;z-index:41;left:0;top:0;bottom:0;width:min(330px,86vw);padding:22px;background:var(--surface);color:var(--text);box-shadow:20px 0 60px #0005;transform:translateX(-105%);transition:transform .25s ease;backdrop-filter:blur(20px)}
+.mobile-menu.open{transform:translateX(0)}
+.mobile-menu-backdrop.open{display:block}
+.mobile-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.mobile-menu-head b{font-family:Italiana,serif;font-size:18px}
+.mobile-menu-head button{border:0;background:transparent;color:var(--text);font-size:30px}
+.mobile-menu-links{display:grid;gap:9px;padding:22px 0}
+.mobile-menu-links button,.mobile-theme-list button{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:14px;padding:14px;text-align:left;font-weight:700}
+.mobile-menu-label{margin:8px 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.mobile-theme-list{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.mobile-theme-list button{display:flex;align-items:center;gap:9px}
+.mobile-theme-list span{width:18px;height:18px;border-radius:50%;flex:none}
+body.menu-open{overflow:hidden}
+
+@media(max-width:800px){
+  header{display:grid;grid-template-columns:42px minmax(0,1fr) 42px;gap:8px;padding:0 14px}
+  .burger-btn{display:block}
+  .brand{justify-self:center;min-width:0;gap:7px}
+  .brand-taylor{font-size:28px;flex:none}
+  .brand small{display:block!important;width:auto!important;max-width:150px;font-size:7px!important;line-height:1.25;letter-spacing:.11em!important;text-align:left!important}
+  #themeBtn{justify-self:end}
+  .mobile-menu{display:block}
+}
+@media(max-width:390px){
+  .brand-taylor{font-size:25px}
+  .brand small{max-width:125px;font-size:6.5px!important}
+}

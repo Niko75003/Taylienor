@@ -36,7 +36,7 @@ function generatedQuiz(){
 }
 
 function go(route,data){state.route=route;if(data)Object.assign(state,data);render();scrollTo(0,0)}
-document.addEventListener('click',async e=>{const r=e.target.closest('[data-route]');if(!r)return;if(r.dataset.route==='album'&&r.dataset.album){const a=ALBUMS.find(x=>x.id===r.dataset.album);go('album',{album:r.dataset.album});await loadAlbumTracks(a);render();return}go(r.dataset.route,{album:r.dataset.album||null})});
+document.addEventListener('click',async e=>{const r=e.target.closest('[data-route]');if(!r)return;closeMobileMenu();if(r.dataset.route==='album'&&r.dataset.album){const a=ALBUMS.find(x=>x.id===r.dataset.album);go('album',{album:r.dataset.album});await loadAlbumTracks(a);render();return}go(r.dataset.route,{album:r.dataset.album||null})});
 $('#themeBtn').onclick=()=>$('#themeDialog').showModal();$('.close').onclick=()=>$('#themeDialog').close();
 function setTheme(name){
   document.documentElement.dataset.theme=name;
@@ -50,6 +50,34 @@ document.querySelectorAll('#themeDialog button[data-theme]').forEach(b=>b.onclic
   $('#themeDialog').close();
 });
 setTheme(localStorage.getItem('alienor-theme')||'soft-summer');
+
+const burgerBtn=$('#burgerBtn'), mobileMenu=$('#mobileMenu'), mobileBackdrop=$('#mobileMenuBackdrop');
+function openMobileMenu(){
+  mobileMenu.classList.add('open');
+  mobileBackdrop.classList.add('open');
+  mobileMenu.setAttribute('aria-hidden','false');
+  burgerBtn.setAttribute('aria-expanded','true');
+  document.body.classList.add('menu-open');
+}
+function closeMobileMenu(){
+  mobileMenu.classList.remove('open');
+  mobileBackdrop.classList.remove('open');
+  mobileMenu.setAttribute('aria-hidden','true');
+  burgerBtn.setAttribute('aria-expanded','false');
+  document.body.classList.remove('menu-open');
+}
+burgerBtn.onclick=openMobileMenu;
+$('#mobileMenuClose').onclick=closeMobileMenu;
+mobileBackdrop.onclick=closeMobileMenu;
+document.querySelectorAll('[data-mobile-route]').forEach(btn=>btn.onclick=()=>{
+  closeMobileMenu();
+  go(btn.dataset.mobileRoute);
+});
+document.querySelectorAll('[data-mobile-theme]').forEach(btn=>btn.onclick=()=>{
+  setTheme(btn.dataset.mobileTheme);
+  closeMobileMenu();
+});
+
 function back(target='home',label='Retour'){return `<div class="backbar"><button class="backbtn" data-route="${target}">← ${label}</button></div>`}
 function head(title,text,backTo='home',backLabel='Accueil'){return `${back(backTo,backLabel)}<section class="page-head"><h1>${title}</h1><p>${text}</p></section>`}
 function exitGame(){return `<button class="exit-game" data-exit-game aria-label="Quitter et revenir à l’accueil" title="Quitter">×</button>`}
