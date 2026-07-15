@@ -1,10 +1,27 @@
 const $=s=>document.querySelector(s), app=$('#app');
+const SUPABASE_URL='https://hohagbpmtrmofxmhaagn.supabase.co';
+const SUPABASE_KEY='sb_publishable_oas22oztrHU_izZWmm5m3A_UMYEdcC7';
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let currentUser=null,syncTimer=null;
+let bestScores=JSON.parse(localStorage.getItem('alienor-best-scores')||'{}');
 const state={route:'home',album:null,count:10,level:'normal',game:null,rankSort:'avg',rankDir:'desc',rankAlbum:'all',rankingView:'simple',openTrack:null};
 const ratings=JSON.parse(localStorage.getItem('alienor-ratings')||'{}');
-const save=()=>localStorage.setItem('alienor-ratings',JSON.stringify(ratings));
+const save=()=>{localStorage.setItem('alienor-ratings',JSON.stringify(ratings));scheduleSync()};
 const allTracks=()=>ALBUMS.flatMap(a=>a.tracks.map((t,i)=>({title:t,album:a.title,albumId:a.id,track:i+1})));
 const catalogCache=JSON.parse(localStorage.getItem('alienor-catalog-v2')||'{}');
 const cleanAlbum=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/taylor.?s version/g,'').replace(/the anthology/g,'').replace(/deluxe version/g,'').replace(/[^a-z0-9]/g,'');
+
+function localPayload(){return {ratings,bestScores,theme:localStorage.getItem('alienor-theme')||'soft-summer',preferences:{rankingView:state.rankingView||'simple'},updatedAt:new Date().toISOString()}}
+function persistBestScores(){localStorage.setItem('alienor-best-scores',JSON.stringify(bestScores))}
+function setSyncStatus(text){const el=$('#syncStatus');if(el)el.textContent=text}
+async function pushToSupabase(){if(!currentUser)return false;setSyncStatus('Synchronisation…');const {error}=await supabaseClient.from('user_data').upsert({user_id:currentUser.id,data:localPayload(),updated_at:new Date().toISOString()},{onConflict:'user_id'});if(error){setSyncStatus('Erreur de synchronisation');return false}setSyncStatus('Synchronisé à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));return true}
+function scheduleSync(){if(!currentUser)return;clearTimeout(syncTimer);syncTimer=setTimeout(pushToSupabase,1200)}
+async function loadFromSupabase(){if(!currentUser)return;const {data,error}=await supabaseClient.from('user_data').select('data').eq('user_id',currentUser.id).maybeSingle();if(error){setSyncStatus('Erreur de chargement');return}if(data?.data){const remote=data.data;if(remote.ratings){Object.keys(ratings).forEach(k=>delete ratings[k]);Object.assign(ratings,remote.ratings);localStorage.setItem('alienor-ratings',JSON.stringify(ratings))}if(remote.bestScores){bestScores=remote.bestScores;persistBestScores()}if(remote.theme)setTheme(remote.theme);if(remote.preferences?.rankingView)state.rankingView=remote.preferences.rankingView}else await pushToSupabase()}
+function scoreKey(type,count,level){return `${type}-${count}-${level}`}
+function updateBestScore(type,score,max){const key=scoreKey(type,state.count,state.level),prev=bestScores[key];if(!prev||score>prev.score){bestScores[key]={score,max,date:new Date().toISOString()};persistBestScores();scheduleSync();return true}return false}
+function renderBestScore(type){const rec=bestScores[scoreKey(type,state.count,state.level)];return rec?`<p class="best-score">Meilleur score : <b>${rec.score}/${rec.max}</b></p>`:''}
+async function initAuth(){const {data:{session}}=await supabaseClient.auth.getSession();currentUser=session?.user||null;if(!currentUser){$('#authSplash').hidden=false;return}$('#authSplash').hidden=true;await loadFromSupabase();render()}
+
 async function loadAlbumTracks(a){
   if(catalogCache[a.id]?.length){a.tracks=catalogCache[a.id];return a.tracks}
   try{
@@ -40,7 +57,7 @@ document.addEventListener('click',async e=>{const r=e.target.closest('[data-rout
 $('#themeBtn').onclick=()=>$('#themeDialog').showModal();$('.close').onclick=()=>$('#themeDialog').close();
 function setTheme(name){
   document.documentElement.dataset.theme=name;
-  localStorage.setItem('alienor-theme',name);
+  localStorage.setItem('alienor-theme',name);scheduleSync();
   document.querySelectorAll('[data-quick-theme]').forEach(b=>b.classList.toggle('active',b.dataset.quickTheme===name));
 }
 document.querySelectorAll('#themeDialog button[data-theme]').forEach(b=>b.onclick=(e)=>{
@@ -180,7 +197,7 @@ function ranking(){
     </div>
   </section>`
 }
-function setup(type){let isB=type==='blindtest';return `<div class="game-shell">${exitGame()}${head(isB?'Blindtest':'Quiz',isB?'Les albums sont mélangés automatiquement.':'Toutes les catégories sont mélangées automatiquement.')}<section class="panel setup"><div class="option"><h3>${isB?'Nombre de morceaux':'Nombre de questions'}</h3><div class="segments">${[1,5,10,20].map(n=>`<button class="${state.count===n?'on':''}" data-count="${n}">${n}</button>`).join('')}</div></div><div class="option"><h3>Niveau de difficulté</h3><div class="segments" style="grid-template-columns:repeat(3,1fr)">${[['easy','Facile'],['normal','Normal'],['hard','Difficile']].map(x=>`<button class="${state.level===x[0]?'on':''}" data-level="${x[0]}">${x[1]}</button>`).join('')}</div></div><p style="text-align:center"><button class="primary" data-start="${type}">Lancer ${isB?'le blindtest':'le quiz'} ▶</button></p></section></div>`}
+function setup(type){let isB=type==='blindtest';return `<div class="game-shell">${exitGame()}${head(isB?'Blindtest':'Quiz',isB?'Les albums sont mélangés automatiquement.':'Toutes les catégories sont mélangées automatiquement.')}<section class="panel setup"><div class="option"><h3>${isB?'Nombre de morceaux':'Nombre de questions'}</h3><div class="segments">${[1,5,10,20].map(n=>`<button class="${state.count===n?'on':''}" data-count="${n}">${n}</button>`).join('')}</div></div><div class="option"><h3>Niveau de difficulté</h3><div class="segments" style="grid-template-columns:repeat(3,1fr)">${[['easy','Facile'],['normal','Normal'],['hard','Difficile']].map(x=>`<button class="${state.level===x[0]?'on':''}" data-level="${x[0]}">${x[1]}</button>`).join('')}</div></div>${renderBestScore(type)}<p style="text-align:center"><button class="primary" data-start="${type}">Lancer ${isB?'le blindtest':'le quiz'} ▶</button></p></section></div>`}
 async function startQuiz(){
   app.innerHTML='<section class="panel game"><h2>Préparation du quiz…</h2><p>Chargement du catalogue complet.</p></section>';
   await ensureCatalog();
@@ -199,10 +216,11 @@ async function loadAudio(){let g=state.game,item=g.items[g.i];try{let term=encod
 function blindGame(){let g=state.game;if(g.i>=g.items.length)return result();return `<div class="game-shell">${exitGame()}${head('Blindtest',`${g.i+1} / ${g.items.length}`)}<section class="panel game"><div class="progress"><span style="width:${g.i/g.items.length*100}%"></span></div><div class="wave"></div><p class="audio-status">Recherche de l’extrait…</p><p><button class="primary play" disabled>▶ Écouter</button></p><div class="answers"><input id="song" placeholder="Titre de la chanson"><input id="alb" placeholder="Album"><input id="track" placeholder="N° de piste"></div><p><button class="primary" data-submit-blind>Valider</button></p><p>Score : ${g.score}</p></section></div>`}
 function result(){
   let g=state.game,max=g.type==='quiz'?g.items.length:g.items.length*4;
+  const isRecord=updateBestScore(g.type,g.score,max);
   return `<section class="hero result-screen" style="text-align:center;align-items:center">
     <button class="exit-game" data-result-home aria-label="Revenir à l’accueil" title="Accueil">×</button>
     <h1><small>Bravo</small>Aliénor !</h1>
-    <p class="score">${g.score} / ${max}</p>
+    <p class="score">${g.score} / ${max}</p>${isRecord?'<p><b>Nouveau record ✦</b></p>':renderBestScore(g.type)}
     <div class="result-actions">
       <button class="primary" data-replay="${g.type}">↻ Rejouer</button>
       <button class="secondary" data-result-home>Retour à l’accueil</button>
@@ -291,6 +309,7 @@ if(trackToggle){
 const viewBtn=e.target.closest('[data-ranking-view]');
 if(viewBtn){
   state.rankingView=viewBtn.dataset.rankingView;
+  scheduleSync();
   render();
   return;
 }
@@ -301,4 +320,10 @@ document.addEventListener('change',e=>{
   if(e.target.id==='rankSort'){state.rankSort=e.target.value;render()}
   if(e.target.id==='rankDir'){state.rankDir=e.target.value;render()}
 });
-render();
+
+$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#authMessage').textContent='Connexion…';const {data,error}=await supabaseClient.auth.signInWithPassword({email:$('#loginEmail').value.trim(),password:$('#loginPassword').value});if(error){$('#authMessage').textContent='Identifiant ou mot de passe incorrect.';return}currentUser=data.user;$('#authSplash').hidden=true;await loadFromSupabase();render()});
+$('#forgotPassword').onclick=async()=>{const email=$('#loginEmail').value.trim();if(!email){$('#authMessage').textContent='Saisis d’abord ton adresse e-mail.';return}const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});$('#authMessage').textContent=error?'Impossible d’envoyer le lien.':'Un lien de réinitialisation a été envoyé.'};
+$('#logoutBtn').onclick=async()=>{await supabaseClient.auth.signOut();currentUser=null;closeMobileMenu();$('#authSplash').hidden=false};
+$('#syncNowBtn').onclick=pushToSupabase;
+supabaseClient.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null});
+initAuth();

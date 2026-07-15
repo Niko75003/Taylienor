@@ -109,3 +109,9 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Le menu contient également le choix de la gamme colorée.
 - Les palettes sont renommées Été, Automne, Hiver et Printemps sur mobile et ordinateur.
 - La pastille de saison reste accessible à droite de l’en-tête.
+
+
+## Version 1.4 — Supabase
+- Connexion e-mail/mot de passe au premier lancement.
+- Synchronisation des notes, meilleurs scores, thème et préférences entre appareils.
+- Sauvegarde locale maintenue en parallèle.
