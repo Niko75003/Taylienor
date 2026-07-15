@@ -84,3 +84,12 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Banque de quiz mixte : discographie, tracklists, chronologie, collaborations, famille, vie publique, engagements, fun facts et photos datées.
 - Questions générées automatiquement à partir du catalogue : plusieurs centaines de combinaisons possibles.
 - Quatre thèmes saisonniers et personnalisation Aliénor.
+
+
+## Version 1.1 — catalogue et quiz photo
+- Les 12 albums studio sont désormais intégrés directement dans `data.js`.
+- Les tracklists ne dépendent plus d’une recherche Apple réussie pour être complètes.
+- 248 pistes sont disponibles dès l’ouverture du site.
+- Le cache du catalogue a été versionné pour ne pas réutiliser d’anciennes listes abrégées.
+- Six questions photographiques utilisent maintenant deux images incluses dans l’archive.
+- Pour une partie de 5 questions ou plus, au moins une question photo est systématiquement intégrée.

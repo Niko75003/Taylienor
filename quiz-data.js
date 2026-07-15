@@ -354,27 +354,59 @@ const EXTRA_QUIZ=[
   {
     "q": "En quelle année cette photo a-t-elle été prise ?",
     "o": [
-      "2007",
+      "2009",
       "2010",
       "2014",
       "2019"
     ],
     "a": 0,
     "c": "Photos & dates",
-    "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Taylor%20Swift%20%282007%29%20retouched.jpg",
+    "image": "assets/taylor-2009-vma.jpg",
     "credit": "Brian Cantoni, CC BY 2.0"
   },
   {
-    "q": "En quelle année Taylor apparaît-elle sur cette photo des iHeartRadio Music Awards ?",
+    "q": "En quelle année cette photo de l’Eras Tour a-t-elle été prise ?",
     "o": [
-      "2016",
-      "2017",
       "2019",
-      "2021"
+      "2021",
+      "2023",
+      "2025"
     ],
     "a": 2,
     "c": "Photos & dates",
-    "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Taylor%20Swift%202%20-%202019%20by%20Glenn%20Francis.jpg",
-    "credit": "Glenn Francis, CC BY-SA 4.0"
+    "image": "assets/taylor-2023-eras-folklore.jpg",
+    "credit": "Paolo V, CC BY 2.0"
+  },
+  {
+    "q": "Lors de quelle cérémonie cette photo de 2009 a-t-elle été prise ?",
+    "o": ["MTV Video Music Awards", "Grammy Awards", "American Music Awards", "Golden Globes"],
+    "a": 0,
+    "c": "Photos & dates",
+    "image": "assets/taylor-2009-vma.jpg",
+    "credit": "Philip Nelson, CC BY-SA 2.0"
+  },
+  {
+    "q": "À quelle époque de sa carrière correspond cette photo ?",
+    "o": ["Fearless", "1989", "reputation", "Midnights"],
+    "a": 0,
+    "c": "Photos & dates",
+    "image": "assets/taylor-2009-vma.jpg",
+    "credit": "Philip Nelson, CC BY-SA 2.0"
+  },
+  {
+    "q": "À quelle tournée correspond cette photo de scène ?",
+    "o": ["The Eras Tour", "Reputation Stadium Tour", "1989 World Tour", "Speak Now World Tour"],
+    "a": 0,
+    "c": "Photos & dates",
+    "image": "assets/taylor-2023-eras-folklore.jpg",
+    "credit": "Paolo V, CC BY 2.0"
+  },
+  {
+    "q": "Dans quelle ville cette photo de l’Eras Tour a-t-elle été prise ?",
+    "o": ["Inglewood / Los Angeles", "Paris", "Londres", "Tokyo"],
+    "a": 0,
+    "c": "Photos & dates",
+    "image": "assets/taylor-2023-eras-folklore.jpg",
+    "credit": "Paolo V, CC BY 2.0"
   }
 ];

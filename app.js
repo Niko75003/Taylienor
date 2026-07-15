@@ -3,7 +3,7 @@ const state={route:'home',album:null,count:10,level:'normal',game:null,rankSort:
 const ratings=JSON.parse(localStorage.getItem('alienor-ratings')||'{}');
 const save=()=>localStorage.setItem('alienor-ratings',JSON.stringify(ratings));
 const allTracks=()=>ALBUMS.flatMap(a=>a.tracks.map((t,i)=>({title:t,album:a.title,albumId:a.id,track:i+1})));
-const catalogCache=JSON.parse(localStorage.getItem('alienor-catalog')||'{}');
+const catalogCache=JSON.parse(localStorage.getItem('alienor-catalog-v2')||'{}');
 const cleanAlbum=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/taylor.?s version/g,'').replace(/the anthology/g,'').replace(/deluxe version/g,'').replace(/[^a-z0-9]/g,'');
 async function loadAlbumTracks(a){
   if(catalogCache[a.id]?.length){a.tracks=catalogCache[a.id];return a.tracks}
@@ -16,7 +16,7 @@ async function loadAlbumTracks(a){
     if(!hit) return a.tracks;
     const lookup=await fetch(`https://itunes.apple.com/lookup?id=${hit.collectionId}&entity=song`).then(r=>r.json());
     const found=lookup.results.filter(x=>x.wrapperType==='track'&&x.trackName).sort((x,y)=>(x.discNumber-y.discNumber)||(x.trackNumber-y.trackNumber)).map(x=>x.trackName);
-    if(found.length>=a.tracks.length){a.tracks=found;catalogCache[a.id]=found;localStorage.setItem('alienor-catalog',JSON.stringify(catalogCache));}
+    if(found.length>=a.tracks.length){a.tracks=found;catalogCache[a.id]=found;localStorage.setItem('alienor-catalog-v2',JSON.stringify(catalogCache));}
   }catch(e){}
   return a.tracks;
 }
@@ -112,7 +112,18 @@ function ranking(){
   </section>`
 }
 function setup(type){let isB=type==='blindtest';return `<div class="game-shell">${exitGame()}${head(isB?'Blindtest':'Quiz',isB?'Les albums sont mélangés automatiquement.':'Toutes les catégories sont mélangées automatiquement.')}<section class="panel setup"><div class="option"><h3>${isB?'Nombre de morceaux':'Nombre de questions'}</h3><div class="segments">${[1,5,10,20].map(n=>`<button class="${state.count===n?'on':''}" data-count="${n}">${n}</button>`).join('')}</div></div><div class="option"><h3>Niveau de difficulté</h3><div class="segments" style="grid-template-columns:repeat(3,1fr)">${[['easy','Facile'],['normal','Normal'],['hard','Difficile']].map(x=>`<button class="${state.level===x[0]?'on':''}" data-level="${x[0]}">${x[1]}</button>`).join('')}</div></div><p style="text-align:center"><button class="primary" data-start="${type}">Lancer ${isB?'le blindtest':'le quiz'} ▶</button></p></section></div>`}
-async function startQuiz(){app.innerHTML='<section class="panel game"><h2>Préparation du quiz…</h2><p>Chargement du catalogue complet.</p></section>';await ensureCatalog();let bank=[...QUIZ,...EXTRA_QUIZ,...generatedQuiz()];let q=bank.sort(()=>Math.random()-.5).slice(0,Math.min(state.count,bank.length));state.game={type:'quiz',items:q,i:0,score:0};render()}
+async function startQuiz(){
+  app.innerHTML='<section class="panel game"><h2>Préparation du quiz…</h2><p>Chargement du catalogue complet.</p></section>';
+  await ensureCatalog();
+  let bank=[...QUIZ,...EXTRA_QUIZ,...generatedQuiz()];
+  let shuffled=bank.sort(()=>Math.random()-.5);
+  let q=shuffled.slice(0,Math.min(state.count,bank.length));
+  if(state.count>=5){
+    const photos=bank.filter(item=>item.image);
+    if(photos.length && !q.some(item=>item.image)) q[Math.floor(Math.random()*q.length)]=photos[Math.floor(Math.random()*photos.length)];
+  }
+  state.game={type:'quiz',items:q,i:0,score:0};render()
+}
 function quizGame(){let g=state.game;if(g.i>=g.items.length)return result();let q=g.items[g.i];return `<div class="game-shell">${exitGame()}${head('Quiz',`${g.i+1} / ${g.items.length}`)}<section class="panel game"><div class="progress"><span style="width:${g.i/g.items.length*100}%"></span></div><p><small>${q.c}</small></p>${q.image?`<figure class="quiz-photo"><img src="${q.image}" alt="Photo mystère de Taylor Swift"><figcaption>${q.credit||''}</figcaption></figure>`:''}<h2>${q.q}</h2><div class="quiz-options">${q.o.map((o,i)=>`<button data-answer="${i}">${String.fromCharCode(65+i)} · ${o}</button>`).join('')}</div><p>Score : ${g.score}</p></section></div>`}
 async function startBlind(){app.innerHTML='<section class="panel game"><h2>Préparation du blindtest…</h2><p>Chargement du catalogue complet.</p></section>';await ensureCatalog();let items=allTracks().sort(()=>Math.random()-.5).slice(0,state.count);state.game={type:'blindtest',items,i:0,score:0,audio:null};render();loadAudio()}
 async function loadAudio(){let g=state.game,item=g.items[g.i];try{let term=encodeURIComponent(`${item.title} Taylor Swift`);let data=await fetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=8`).then(r=>r.json());let hit=data.results.find(x=>x.artistName.toLowerCase().includes('taylor swift')&&x.previewUrl);if(hit){g.audio=new Audio(hit.previewUrl);$('.play').disabled=false;$('.audio-status').textContent='Extrait prêt';}else $('.audio-status').textContent='Extrait indisponible';}catch(e){$('.audio-status').textContent='Connexion audio indisponible';}}
