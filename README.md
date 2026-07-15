@@ -129,3 +129,8 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Une réponse de blindtest est également acceptée si elle contient au moins trois mots significatifs du titre.
 - Ces trois mots peuvent comporter de petites fautes d’orthographe.
 - Les mots très courts et les mots-outils fréquents ne comptent pas dans cette règle.
+
+
+## Version 1.7
+- Suppression de la phrase explicative sous le titre du splash screen.
+- Un second clic sur la note 1 remet désormais le critère à 0.
