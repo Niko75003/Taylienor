@@ -1,0 +1,86 @@
+# Aliénor’s Swiftie Experience — Alpha 1
+
+## Mise en ligne sur GitHub Pages
+1. Créez un dépôt GitHub public.
+2. Déposez à la racine : `index.html`, `styles.css`, `data.js`, `app.js`.
+3. Dans **Settings > Pages**, choisissez **Deploy from a branch**, branche `main`, dossier `/root`.
+4. GitHub affiche ensuite l’adresse publique du site.
+
+## Fonctions incluses
+- Accueil personnalisé pour Aliénor.
+- Quatre thèmes saisonniers mémorisés dans le navigateur.
+- Catalogue des albums studio, avec priorité aux Taylor’s Versions.
+- Notation sur 4 critères et classement général.
+- Blindtest 1 / 5 / 10 / 20 avec trois difficultés.
+- Recherche automatique d’extraits de 30 secondes via l’API publique iTunes.
+- Quiz 1 / 5 / 10 / 20, catégories mélangées.
+- Sauvegarde locale automatique des notes.
+
+## État de cette alpha
+L’interface et les moteurs sont fonctionnels. Le fichier `data.js` contient volontairement un catalogue de démonstration abrégé et une première base de questions. La prochaine étape est de compléter toutes les tracklists, enrichir le quiz, ajouter les photos sous licence et améliorer la tolérance des réponses du blindtest.
+
+## Données
+Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Apple ni compte joueur n’est requis.
+
+
+## Alpha 2
+- Sélecteur de thèmes toujours visible avec quatre pastilles colorées.
+- Ambiances saisonnières nettement renforcées.
+- Bouton retour contextuel sur tous les écrans.
+- Chargement automatique des pochettes d’albums depuis l’API publique iTunes.
+- Les images restent distantes et ne sont pas redistribuées dans l’archive.
+
+
+## Alpha 3
+- Correction du changement de thème : le sélecteur ciblait auparavant aussi la balise HTML, ce qui pouvait annuler le choix.
+- Une seule pastille de couleur reste visible dans le menu supérieur.
+- Suppression des rappels de thème à l’intérieur des pages.
+- Ajout d’une croix de sortie dans les écrans Quiz et Blindtest, avant et pendant les parties.
+- La sortie interrompt également l’extrait audio en cours.
+
+
+## Alpha 4
+- Croix de sortie déplacée en haut à droite dans Quiz et Guess.
+- Ajout d’un bouton « Réinitialiser la notation » dans chaque album.
+- Confirmation avant suppression des notes de l’album.
+- Critères de notation mis à jour : Reliability, Lyrics, Voice, Production.
+
+
+## Alpha 5
+- Écran de fin du quiz et du blindtest corrigé.
+- Bouton « Rejouer » fonctionnel avec les mêmes réglages.
+- Bouton « Retour à l’accueil » fonctionnel.
+- Croix de sortie également disponible sur l’écran de résultat.
+
+
+## Alpha 6
+- Ajout des en-têtes de colonnes dans le classement général.
+- Tri par note générale, Reliability, Lyrics, Voice ou Production.
+- Choix de l’ordre croissant ou décroissant.
+- Filtre par album.
+- Tableau horizontalement défilable sur mobile afin de conserver tous les critères visibles.
+
+
+## Alpha 7
+- Ajout d’un bouton « Réinitialiser tous les classements » dans le classement général.
+- Double confirmation obligatoire avant suppression.
+- Réinitialisation également des filtres et du tri du classement.
+
+
+## Alpha 8
+- Le bouton « Voir le classement général » est désormais placé en haut de la page Rank.
+
+
+## Alpha 9
+- L’en-tête « Classement » du tableau général est remplacé par le symbole « # ».
+
+# Version complète 1.0
+
+- Catalogue de tous les albums studio, avec priorité aux Taylor’s Versions.
+- Chargement automatique des tracklists intégrales depuis Apple/iTunes et cache local.
+- Classement selon Reliability, Lyrics, Voice et Production.
+- Tableau général filtrable et triable, réinitialisation par album ou globale.
+- Blindtest de 1, 5, 10 ou 20 titres, avec trois niveaux de difficulté.
+- Banque de quiz mixte : discographie, tracklists, chronologie, collaborations, famille, vie publique, engagements, fun facts et photos datées.
+- Questions générées automatiquement à partir du catalogue : plusieurs centaines de combinaisons possibles.
+- Quatre thèmes saisonniers et personnalisation Aliénor.
