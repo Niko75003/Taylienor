@@ -134,3 +134,9 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 ## Version 1.7
 - Suppression de la phrase explicative sous le titre du splash screen.
 - Un second clic sur la note 1 remet désormais le critère à 0.
+
+
+## Version 1.8 — compte desktop
+- Ajout d’une icône de compte dans l’en-tête desktop.
+- Accès au statut de synchronisation, à la synchronisation manuelle et à la déconnexion.
+- Le menu burger mobile reste inchangé.

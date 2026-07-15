@@ -94,6 +94,21 @@ document.querySelectorAll('[data-mobile-theme]').forEach(btn=>btn.onclick=()=>{
   setTheme(btn.dataset.mobileTheme);
   closeMobileMenu();
 });
+const accountBtn=$('#accountBtn'), accountMenu=$('#accountMenu');
+function closeAccountMenu(){
+  if(!accountMenu) return;
+  accountMenu.hidden=true;
+  accountBtn.setAttribute('aria-expanded','false');
+}
+accountBtn.onclick=e=>{
+  e.stopPropagation();
+  accountMenu.hidden=!accountMenu.hidden;
+  accountBtn.setAttribute('aria-expanded',String(!accountMenu.hidden));
+};
+document.addEventListener('click',e=>{
+  if(accountMenu && !accountMenu.hidden && !e.target.closest('.account-menu-wrap')) closeAccountMenu();
+});
+
 
 function back(target='home',label='Retour'){return `<div class="backbar"><button class="backbtn" data-route="${target}">← ${label}</button></div>`}
 function head(title,text,backTo='home',backLabel='Accueil'){return `${back(backTo,backLabel)}<section class="page-head"><h1>${title}</h1><p>${text}</p></section>`}
@@ -390,9 +405,13 @@ document.addEventListener('change',e=>{
   if(e.target.id==='rankDir'){state.rankDir=e.target.value;render()}
 });
 
-$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#authMessage').textContent='Connexion…';const {data,error}=await supabaseClient.auth.signInWithPassword({email:$('#loginEmail').value.trim(),password:$('#loginPassword').value});if(error){$('#authMessage').textContent='Identifiant ou mot de passe incorrect.';return}currentUser=data.user;$('#authSplash').hidden=true;await loadFromSupabase();render()});
+$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#authMessage').textContent='Connexion…';const {data,error}=await supabaseClient.auth.signInWithPassword({email:$('#loginEmail').value.trim(),password:$('#loginPassword').value});if(error){$('#authMessage').textContent='Identifiant ou mot de passe incorrect.';return}currentUser=data.user;$('#authSplash').hidden=true;const accountEmail=$('#desktopAccountEmail');if(accountEmail)accountEmail.textContent=currentUser.email||'Compte connecté';await loadFromSupabase();render()});
 $('#forgotPassword').onclick=async()=>{const email=$('#loginEmail').value.trim();if(!email){$('#authMessage').textContent='Saisis d’abord ton adresse e-mail.';return}const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});$('#authMessage').textContent=error?'Impossible d’envoyer le lien.':'Un lien de réinitialisation a été envoyé.'};
-$('#logoutBtn').onclick=async()=>{await supabaseClient.auth.signOut();currentUser=null;closeMobileMenu();$('#authSplash').hidden=false};
-$('#syncNowBtn').onclick=pushToSupabase;
+async function logoutUser(){await supabaseClient.auth.signOut();currentUser=null;closeMobileMenu();closeAccountMenu();$('#authSplash').hidden=false}
+async function syncUserNow(){await pushToSupabase();showSyncToast('Données synchronisées')}
+$('#logoutBtn').onclick=logoutUser;
+$('#desktopLogoutBtn').onclick=logoutUser;
+$('#syncNowBtn').onclick=syncUserNow;
+$('#desktopSyncBtn').onclick=syncUserNow;
 supabaseClient.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null});
 initAuth();
