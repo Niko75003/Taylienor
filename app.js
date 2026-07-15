@@ -225,10 +225,76 @@ async function startQuiz(){
   }
   state.game={type:'quiz',items:q,i:0,score:0};render()
 }
-function quizGame(){let g=state.game;if(g.i>=g.items.length)return result();let q=g.items[g.i];return `<div class="game-shell">${exitGame()}${head('Quiz',`${g.i+1} / ${g.items.length}`)}<section class="panel game"><div class="progress"><span style="width:${g.i/g.items.length*100}%"></span></div><p><small>${q.c}</small></p>${q.image?`<figure class="quiz-photo"><img src="${q.image}" alt="Photo mystère de Taylor Swift"><figcaption>${q.credit||''}</figcaption></figure>`:''}<h2>${q.q}</h2><div class="quiz-options">${q.o.map((o,i)=>`<button data-answer="${i}">${String.fromCharCode(65+i)} · ${o}</button>`).join('')}</div><p>Score : ${g.score}</p></section></div>`}
-async function startBlind(){app.innerHTML='<section class="panel game loading-state"><div class="loading-icon" aria-hidden="true"></div><h2>Préparation du blindtest…</h2></section>';await ensureCatalog();let items=allTracks().sort(()=>Math.random()-.5).slice(0,state.count);state.game={type:'blindtest',items,i:0,score:0,audio:null};render();loadAudio()}
-async function loadAudio(){let g=state.game,item=g.items[g.i];try{let term=encodeURIComponent(`${item.title} Taylor Swift`);let data=await fetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=8`).then(r=>r.json());let hit=data.results.find(x=>x.artistName.toLowerCase().includes('taylor swift')&&x.previewUrl);if(hit){g.audio=new Audio(hit.previewUrl);$('.play').disabled=false;$('.audio-status').textContent='Extrait prêt';}else $('.audio-status').textContent='Extrait indisponible';}catch(e){$('.audio-status').textContent='Connexion audio indisponible';}}
-function blindGame(){let g=state.game;if(g.i>=g.items.length)return result();return `<div class="game-shell">${exitGame()}${head('Blindtest',`${g.i+1} / ${g.items.length}`)}<section class="panel game"><div class="progress"><span style="width:${g.i/g.items.length*100}%"></span></div><div class="wave"></div><div class="audio-loading"><div class="loading-icon mini" aria-hidden="true"></div><p class="audio-status">Recherche de l’extrait…</p></div><p><button class="primary play" disabled>▶ Écouter</button></p><div class="answers"><input id="song" placeholder="Titre de la chanson"><input id="alb" placeholder="Album"><input id="track" placeholder="N° de piste"></div><p><button class="primary" data-submit-blind>Valider</button></p><p>Score : ${g.score}</p></section></div>`}
+function feedbackScreen(){
+  const g=state.game,f=g.feedback;
+  const isQuiz=g.type==='quiz';
+  const title=f.correct?'Bravo !':'Raté';
+  const detail=isQuiz
+    ? `<p class="feedback-answer">Bonne réponse : <b>${f.correctAnswer}</b></p>`
+    : `<div class="feedback-grid">
+        <p>Titre : <b>${f.item.title}</b> ${f.songOk?'✓':'✕'}</p>
+        <p>Album : <b>${f.item.album}</b> ${f.albumOk?'✓':'✕'}</p>
+        <p>Piste : <b>${f.item.track}</b> ${f.trackOk?'✓':'✕'}</p>
+        <p>Points gagnés : <b>${f.points}/4</b></p>
+      </div>`;
+  return `<div class="game-shell">${exitGame()}<section class="panel game feedback-screen ${f.correct?'success':'failure'}">
+    <div class="feedback-symbol">${f.correct?'✓':'×'}</div>
+    <h2>${title}</h2>
+    ${detail}
+    <button class="primary" data-next-question>${g.i+1>=g.items.length?'Voir le résultat':'Question suivante →'}</button>
+  </section></div>`;
+}
+function quizGame(){
+  let g=state.game;
+  if(g.feedback)return feedbackScreen();
+  if(g.i>=g.items.length)return result();
+  let q=g.items[g.i];
+  return `<div class="game-shell">${exitGame()}${head('Quiz',`${g.i+1} / ${g.items.length}`)}
+  <section class="panel game"><div class="progress"><span style="width:${g.i/g.items.length*100}%"></span></div>
+  <p><small>${q.c}</small></p>${q.image?`<figure class="quiz-photo"><img src="${q.image}" alt="Photo mystère de Taylor Swift"><figcaption>${q.credit||''}</figcaption></figure>`:''}
+  <h2>${q.q}</h2><div class="quiz-options">${q.o.map((o,i)=>`<button data-answer="${i}">${String.fromCharCode(65+i)} · ${o}</button>`).join('')}</div>
+  <p>Score : ${g.score}</p></section></div>`
+}
+async function startBlind(){
+  app.innerHTML='<section class="panel game loading-state"><div class="loading-icon" aria-hidden="true"></div><h2>Préparation du blindtest…</h2></section>';
+  await ensureCatalog();
+  let items=allTracks().sort(()=>Math.random()-.5).slice(0,state.count);
+  state.game={type:'blindtest',items,i:0,score:0,audio:null,playing:false,feedback:null};
+  render();loadAudio()
+}
+async function loadAudio(){
+  let g=state.game,item=g.items[g.i];
+  try{
+    let term=encodeURIComponent(`${item.title} Taylor Swift`);
+    let data=await fetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=8`).then(r=>r.json());
+    let hit=data.results.find(x=>x.artistName.toLowerCase().includes('taylor swift')&&x.previewUrl);
+    if(hit){
+      g.audio=new Audio(hit.previewUrl);
+      g.audio.addEventListener('play',()=>{g.playing=true;document.querySelector('.wave')?.classList.add('playing');document.querySelector('.play')?.classList.add('playing')});
+      const stop=()=>{g.playing=false;document.querySelector('.wave')?.classList.remove('playing');document.querySelector('.play')?.classList.remove('playing')};
+      g.audio.addEventListener('pause',stop);g.audio.addEventListener('ended',stop);
+      const playBtn=$('.play');if(playBtn){playBtn.disabled=false;playBtn.classList.add('ready')}
+      document.querySelector('.audio-loading')?.remove();
+    }else{
+      const s=$('.audio-status');if(s)s.textContent='Extrait indisponible';
+    }
+  }catch(e){const s=$('.audio-status');if(s)s.textContent='Connexion audio indisponible'}
+}
+function blindGame(){
+  let g=state.game;
+  if(g.feedback)return feedbackScreen();
+  if(g.i>=g.items.length)return result();
+  return `<div class="game-shell">${exitGame()}${head('Blindtest',`${g.i+1} / ${g.items.length}`)}
+  <section class="panel game">
+    <p class="blind-rules"><b>Barème :</b> titre 2 points · album 1 point · numéro de piste 1 point.</p>
+    <div class="progress"><span style="width:${g.i/g.items.length*100}%"></span></div>
+    <div class="wave"></div>
+    <div class="audio-loading"><div class="loading-icon mini" aria-hidden="true"></div><p class="audio-status">Recherche de l’extrait…</p></div>
+    <p><button class="primary play" disabled><span class="play-arrow">▶</span> Écouter</button></p>
+    <div class="answers"><input id="song" placeholder="Titre de la chanson"><input id="alb" placeholder="Album"><input id="track" placeholder="N° de piste"></div>
+    <p><button class="primary" data-submit-blind>Valider</button></p><p>Score : ${g.score}</p>
+  </section></div>`
+}
 function result(){
   let g=state.game,max=g.type==='quiz'?g.items.length:g.items.length*4;
   const isRecord=updateBestScore(g.type,g.score,max);
@@ -290,6 +356,15 @@ if(replayBtn){
   return;
 }
 if(e.target.closest('[data-exit-game]')){state.game?.audio?.pause();state.game=null;go('home');return}
+const nextBtn=e.target.closest('[data-next-question]');
+if(nextBtn){
+  const g=state.game;
+  g.feedback=null;
+  g.i++;
+  render();
+  if(g.type==='blindtest'&&g.i<g.items.length)loadAudio();
+  return;
+}
 const resetAllBtn=e.target.closest('[data-reset-all-rankings]');
 if(resetAllBtn){
   const first=confirm('Réinitialiser toutes les notes de tous les albums ? Cette action supprimera tout le classement.');
@@ -328,76 +403,33 @@ if(viewBtn){
   render();
   return;
 }
-let b=e.target.closest('[data-rate]');if(b){let k=b.dataset.rate,c=+b.dataset.crit,v=+b.dataset.value;ratings[k]=ratings[k]||[0,0,0,0];ratings[k][c]=(v===1&&ratings[k][c]===1)?0:v;save();render()}if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();if(e.target.matches('.play')&&state.game.audio){state.game.audio.currentTime=state.level==='hard'?8:state.level==='easy'?0:4;state.game.audio.play();setTimeout(()=>state.game.audio.pause(),state.level==='hard'?5000:state.level==='easy'?15000:10000)}if(e.target.dataset.answer!==undefined){let g=state.game,q=g.items[g.i];if(+e.target.dataset.answer===q.a)g.score++;g.i++;render()}if(e.target.hasAttribute('data-submit-blind')){
-  let g=state.game,item=g.items[g.i];
-  const normalize=s=>(s||'')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/\(taylor.?s version\)/g,'')
-    .replace(/\bthe\b/g,'')
-    .replace(/&/g,'and')
-    .replace(/[^a-z0-9]/g,'');
-  const levenshtein=(a,b)=>{
-    if(!a.length)return b.length;if(!b.length)return a.length;
-    const row=Array.from({length:b.length+1},(_,i)=>i);
-    for(let i=1;i<=a.length;i++){
-      let prev=row[0];row[0]=i;
-      for(let j=1;j<=b.length;j++){
-        const tmp=row[j];
-        row[j]=Math.min(row[j]+1,row[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));
-        prev=tmp;
-      }
-    }
-    return row[b.length];
-  };
-  const similarity=(a,b)=>{
-    a=normalize(a);b=normalize(b);
-    if(!a||!b)return 0;
-    if(a===b)return 1;
-    if(a.includes(b)||b.includes(a))return Math.min(a.length,b.length)/Math.max(a.length,b.length)+0.15;
-    return 1-levenshtein(a,b)/Math.max(a.length,b.length);
-  };
-  const significantWords=s=>(s||'')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/\(taylor.?s version\)/g,'')
-    .replace(/[^a-z0-9\s]/g,' ')
-    .split(/\s+/)
-    .filter(w=>w.length>=3 && !['the','and','for','with','from','this','that','you','your','are','was','were','its','into','out','too'].includes(w));
-  const hasThreeCloseWords=(input,target)=>{
-    const inputWords=significantWords(input);
-    const targetWords=significantWords(target);
-    if(inputWords.length<3 || targetWords.length<3) return false;
-    let matched=0;
-    const used=new Set();
-    for(const tw of targetWords){
-      let bestIndex=-1,bestScore=0;
-      inputWords.forEach((iw,idx)=>{
-        if(used.has(idx)) return;
-        const score=similarity(iw,tw);
-        if(score>bestScore){bestScore=score;bestIndex=idx}
-      });
-      if(bestScore>=0.72 && bestIndex>=0){
-        matched++;
-        used.add(bestIndex);
-      }
-      if(matched>=3) return true;
-    }
-    return false;
-  };
-  const songInput=$('#song').value;
-  const albumInput=$('#alb').value;
-  let pts=0;
-  if(similarity(songInput,item.title)>=0.68 || hasThreeCloseWords(songInput,item.title))pts+=2;
-  if(similarity(albumInput,item.album)>=0.58)pts++;
-  if(String($('#track').value).trim()!=='' && Math.abs(+$('#track').value-item.track)<=0)pts++;
-  g.score+=pts;
-  g.i++;
-  g.audio?.pause();
-  g.audio=null;
+let b=e.target.closest('[data-rate]');if(b){let k=b.dataset.rate,c=+b.dataset.crit,v=+b.dataset.value;ratings[k]=ratings[k]||[0,0,0,0];ratings[k][c]=(v===1&&ratings[k][c]===1)?0:v;save();render()}if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();if(e.target.closest('.play')&&state.game.audio){
+  state.game.audio.currentTime=state.level==='hard'?8:state.level==='easy'?0:4;
+  state.game.audio.play();
+  clearTimeout(state.game.pauseTimer);
+  state.game.pauseTimer=setTimeout(()=>state.game.audio.pause(),state.level==='hard'?5000:state.level==='easy'?15000:10000);
+}if(e.target.dataset.answer!==undefined){
+  let g=state.game,q=g.items[g.i],chosen=+e.target.dataset.answer,correct=chosen===q.a;
+  if(correct)g.score++;
+  g.feedback={correct,correctAnswer:q.o[q.a]};
   render();
-  if(g.i<g.items.length)loadAudio()
-}})
+}if(e.target.hasAttribute('data-submit-blind')){
+  let g=state.game,item=g.items[g.i];
+  const normalize=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\(taylor.?s version\)/g,'').replace(/\bthe\b/g,'').replace(/&/g,'and').replace(/[^a-z0-9]/g,'');
+  const levenshtein=(a,b)=>{if(!a.length)return b.length;if(!b.length)return a.length;const row=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let prev=row[0];row[0]=i;for(let j=1;j<=b.length;j++){const tmp=row[j];row[j]=Math.min(row[j]+1,row[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=tmp}}return row[b.length]};
+  const similarity=(a,b)=>{a=normalize(a);b=normalize(b);if(!a||!b)return 0;if(a===b)return 1;if(a.includes(b)||b.includes(a))return Math.min(a.length,b.length)/Math.max(a.length,b.length)+0.15;return 1-levenshtein(a,b)/Math.max(a.length,b.length)};
+  const significantWords=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\(taylor.?s version\)/g,'').replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>=3&&!['the','and','for','with','from','this','that','you','your','are','was','were','its','into','out','too'].includes(w));
+  const hasThreeCloseWords=(input,target)=>{const inputWords=significantWords(input),targetWords=significantWords(target);if(inputWords.length<3||targetWords.length<3)return false;let matched=0;const used=new Set();for(const tw of targetWords){let bestIndex=-1,bestScore=0;inputWords.forEach((iw,idx)=>{if(used.has(idx))return;const score=similarity(iw,tw);if(score>bestScore){bestScore=score;bestIndex=idx}});if(bestScore>=0.72&&bestIndex>=0){matched++;used.add(bestIndex)}if(matched>=3)return true}return false};
+  const songOk=similarity($('#song').value,item.title)>=0.68||hasThreeCloseWords($('#song').value,item.title);
+  const albumOk=similarity($('#alb').value,item.album)>=0.58;
+  const trackOk=String($('#track').value).trim()!==''&&+$('#track').value===item.track;
+  const points=(songOk?2:0)+(albumOk?1:0)+(trackOk?1:0);
+  g.score+=points;
+  g.audio?.pause();g.audio=null;
+  g.feedback={correct:points===4,item,songOk,albumOk,trackOk,points};
+  render();
+}
+})
 
 document.addEventListener('change',e=>{
   if(e.target.id==='rankAlbumFilter'){state.rankAlbum=e.target.value;render()}

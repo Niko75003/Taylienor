@@ -199,3 +199,22 @@ body.menu-open{overflow:hidden}
 
 .theme-menu-dot span{width:18px;height:18px}
 .account-menu button,.top-popover button{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:11px}
+
+/* Version 2.0 — corrections intermédiaires et audio */
+.custom-account-icon{width:20px;height:20px;display:block;background:currentColor;mask:url("assets/account-icon.png") center/contain no-repeat;-webkit-mask:url("assets/account-icon.png") center/contain no-repeat}
+.person-icon{display:none!important}
+.feedback-screen{text-align:center;max-width:720px;margin:auto;min-height:360px;display:grid;place-content:center;gap:15px}
+.feedback-symbol{width:72px;height:72px;margin:auto;border-radius:50%;display:grid;place-items:center;font-size:48px;font-weight:700}
+.feedback-screen.success .feedback-symbol{background:color-mix(in srgb,var(--success) 20%,transparent);color:var(--success)}
+.feedback-screen.failure .feedback-symbol{background:color-mix(in srgb,var(--danger) 18%,transparent);color:var(--danger)}
+.feedback-screen h2{font:48px Italiana;margin:0}
+.feedback-answer{font-size:18px}
+.feedback-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left;margin:8px 0 12px}
+.feedback-grid p{margin:0;padding:12px;border:1px solid var(--border);border-radius:12px}
+.blind-rules{margin:0 0 18px;padding:11px 14px;border-radius:12px;background:var(--soft);font-size:12px}
+.wave{animation:none!important;opacity:.4;transform:scaleY(.5)}
+.wave.playing{animation:pulse 1.5s infinite!important;opacity:1}
+.play.ready .play-arrow{display:inline-block;animation:playNudge .75s ease-in-out infinite}
+.play.playing .play-arrow{animation:none}
+@keyframes playNudge{0%,100%{transform:translateX(0) scale(1)}50%{transform:translateX(4px) scale(1.12)}}
+@media(max-width:600px){.feedback-grid{grid-template-columns:1fr}}

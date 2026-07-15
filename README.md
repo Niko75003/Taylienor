@@ -149,3 +149,14 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Bouton Accueil et croix de sortie alignés.
 - Ajout d’un indicateur de chargement animé pour Quiz, Guess et la recherche d’extrait audio.
 - Nouveau libellé : « Quelle est ta gamme colorée préférée, Aliénor ? »
+
+
+## Version 2.0
+- Écran intermédiaire Bravo / Raté après chaque réponse.
+- Affichage de la bonne réponse avant de passer à la question suivante.
+- Détail des points et bonnes solutions dans le blindtest.
+- Rappel permanent du barème du blindtest.
+- Le bloc « Extrait prêt » disparaît dès que l’audio est chargé.
+- La flèche du bouton Écouter s’anime lorsque l’extrait est disponible.
+- L’onde sonore ne s’anime que pendant la lecture.
+- Nouveau pictogramme de compte fourni par l’utilisateur.
