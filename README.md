@@ -160,3 +160,11 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - La flèche du bouton Écouter s’anime lorsque l’extrait est disponible.
 - L’onde sonore ne s’anime que pendant la lecture.
 - Nouveau pictogramme de compte fourni par l’utilisateur.
+
+
+## Version 2.1
+- Nouveau pictogramme de compte en SVG.
+- Ajout de « Réinitialiser tous les scores » dans les menus compte mobile et desktop, avec double confirmation.
+- Ajout de la mention « Made with love. Happy birthday. » dans les menus compte et sur l’écran de connexion.
+- Phrases de réussite et d’échec randomisées dans Quiz et Blindtest.
+- Barème du blindtest transformé en trois pastilles graphiques.

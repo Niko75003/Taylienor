@@ -225,10 +225,24 @@ async function startQuiz(){
   }
   state.game={type:'quiz',items:q,i:0,score:0};render()
 }
+const SUCCESS_PHRASES=[
+  "On a enfin trouvé la 9e merveille du monde !",
+  "Tu es la queen que tu penses être !",
+  "Tu veux pas rater ? Même pas un peuuuu ?",
+  "EX-TA-TIQUE..."
+];
+const FAILURE_PHRASES=[
+  "Moi qui pensais que tu étais nulle à devineuf...",
+  "Tu n'étais pas sensée être fan ?",
+  "Est-ce que tu mérites vraiment Taylor ?",
+  "Tu veux pas réussir ? Même pas un peuuuu ?"
+];
+const randomPhrase=list=>list[Math.floor(Math.random()*list.length)];
 function feedbackScreen(){
   const g=state.game,f=g.feedback;
   const isQuiz=g.type==='quiz';
   const title=f.correct?'Bravo !':'Raté';
+  const phrase=f.phrase||(f.phrase=randomPhrase(f.correct?SUCCESS_PHRASES:FAILURE_PHRASES));
   const detail=isQuiz
     ? `<p class="feedback-answer">Bonne réponse : <b>${f.correctAnswer}</b></p>`
     : `<div class="feedback-grid">
@@ -240,6 +254,7 @@ function feedbackScreen(){
   return `<div class="game-shell">${exitGame()}<section class="panel game feedback-screen ${f.correct?'success':'failure'}">
     <div class="feedback-symbol">${f.correct?'✓':'×'}</div>
     <h2>${title}</h2>
+    <p class="feedback-phrase">${phrase}</p>
     ${detail}
     <button class="primary" data-next-question>${g.i+1>=g.items.length?'Voir le résultat':'Question suivante →'}</button>
   </section></div>`;
@@ -286,7 +301,11 @@ function blindGame(){
   if(g.i>=g.items.length)return result();
   return `<div class="game-shell">${exitGame()}${head('Blindtest',`${g.i+1} / ${g.items.length}`)}
   <section class="panel game">
-    <p class="blind-rules"><b>Barème :</b> titre 2 points · album 1 point · numéro de piste 1 point.</p>
+    <div class="blind-rules" aria-label="Barème des points">
+  <span><b>2</b><small>titre</small></span>
+  <span><b>1</b><small>album</small></span>
+  <span><b>1</b><small>numéro de piste</small></span>
+</div>
     <div class="progress"><span style="width:${g.i/g.items.length*100}%"></span></div>
     <div class="wave"></div>
     <div class="audio-loading"><div class="loading-icon mini" aria-hidden="true"></div><p class="audio-status">Recherche de l’extrait…</p></div>
@@ -441,9 +460,23 @@ $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#authM
 $('#forgotPassword').onclick=async()=>{const email=$('#loginEmail').value.trim();if(!email){$('#authMessage').textContent='Saisis d’abord ton adresse e-mail.';return}const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});$('#authMessage').textContent=error?'Impossible d’envoyer le lien.':'Un lien de réinitialisation a été envoyé.'};
 async function logoutUser(){await supabaseClient.auth.signOut();currentUser=null;closeMobileMenu();closeAccountMenu();$('#authSplash').hidden=false}
 async function syncUserNow(){await pushToSupabase();showSyncToast('Données synchronisées')}
+
+function resetAllScores(){
+  const first=confirm('Réinitialiser tous les meilleurs scores du Quiz et du Blindtest ?');
+  if(!first)return;
+  const second=confirm('Dernière confirmation : tous les records seront supprimés. Continuer ?');
+  if(!second)return;
+  bestScores={};
+  persistBestScores();
+  scheduleSync();
+  showSyncToast('Tous les scores ont été réinitialisés');
+  render();
+}
 $('#logoutBtn').onclick=logoutUser;
 $('#desktopLogoutBtn').onclick=logoutUser;
 $('#syncNowBtn').onclick=syncUserNow;
 $('#desktopSyncBtn').onclick=syncUserNow;
+$('#resetScoresBtn').onclick=resetAllScores;
+$('#desktopResetScoresBtn').onclick=resetAllScores;
 supabaseClient.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null});
 initAuth();
