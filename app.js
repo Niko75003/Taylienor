@@ -5,6 +5,12 @@ const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 let currentUser=null,syncTimer=null;
 let bestScores=JSON.parse(localStorage.getItem('alienor-best-scores')||'{}');
 
+const state={route:'home',album:null,count:10,level:'normal',game:null,rankSort:'avg',rankDir:'desc',rankAlbum:'all',rankingView:'simple',openTrack:null};
+const ratings=JSON.parse(localStorage.getItem('alienor-ratings')||'{}');
+let ratingUpdated=JSON.parse(localStorage.getItem('alienor-rating-updated')||'{}');
+let ratingDeleted=JSON.parse(localStorage.getItem('alienor-rating-deleted')||'{}');
+let localUpdatedAt=localStorage.getItem('alienor-local-updated-at')||new Date(0).toISOString();
+
 if(Object.keys(ratings).length && !Object.keys(ratingUpdated).length){
   const migratedAt=localUpdatedAt!==new Date(0).toISOString()?localUpdatedAt:new Date().toISOString();
   Object.keys(ratings).forEach(key=>ratingUpdated[key]=migratedAt);
@@ -12,12 +18,6 @@ if(Object.keys(ratings).length && !Object.keys(ratingUpdated).length){
   localStorage.setItem('alienor-rating-updated',JSON.stringify(ratingUpdated));
   localStorage.setItem('alienor-local-updated-at',localUpdatedAt);
 }
-
-const state={route:'home',album:null,count:10,level:'normal',game:null,rankSort:'avg',rankDir:'desc',rankAlbum:'all',rankingView:'simple',openTrack:null};
-const ratings=JSON.parse(localStorage.getItem('alienor-ratings')||'{}');
-let ratingUpdated=JSON.parse(localStorage.getItem('alienor-rating-updated')||'{}');
-let ratingDeleted=JSON.parse(localStorage.getItem('alienor-rating-deleted')||'{}');
-let localUpdatedAt=localStorage.getItem('alienor-local-updated-at')||new Date(0).toISOString();
 const persistLocalState=()=>{
   localStorage.setItem('alienor-ratings',JSON.stringify(ratings));
   localStorage.setItem('alienor-rating-updated',JSON.stringify(ratingUpdated));

@@ -182,3 +182,8 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Vérification automatique au retour sur l’onglet, au retour en ligne et toutes les 15 secondes lorsque le site est visible.
 - Le bouton « Synchroniser maintenant » récupère et fusionne les changements avant l’envoi.
 - Les meilleurs scores sont fusionnés en conservant le score le plus élevé.
+
+
+## Correctif 2.3.1
+- Correction d’une erreur JavaScript au démarrage : la migration des anciennes notes était exécutée avant l’initialisation des variables de stockage.
+- Le site et les menus sont à nouveau fonctionnels.
