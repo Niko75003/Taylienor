@@ -206,3 +206,10 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Une synchronisation sans modification ne fabrique plus une nouvelle modification locale.
 - Récupération automatique lors de la restauration ou du renouvellement de session.
 - Ajout d’un numéro de version aux fichiers JavaScript et CSS pour empêcher Chrome d’utiliser une ancienne copie en cache.
+
+
+## Version 2.5 — clés de notation stables
+- Les notes ne sont plus identifiées par le titre du morceau, qui pouvait varier selon le cache iTunes de chaque navigateur.
+- Chaque note utilise désormais une clé stable composée de l’album et du numéro de piste.
+- Migration automatique des anciennes notes locales et distantes vers le nouveau format.
+- Les classements deviennent cohérents entre mobile, Chrome, Safari et les différents domaines.

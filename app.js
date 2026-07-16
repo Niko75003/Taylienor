@@ -48,6 +48,40 @@ const save=()=>{touchLocal();scheduleSync()};
 const allTracks=()=>ALBUMS.flatMap(a=>a.tracks.map((t,i)=>({title:t,album:a.title,albumId:a.id,track:i+1})));
 const catalogCache=JSON.parse(localStorage.getItem('alienor-catalog-v2')||'{}');
 const cleanAlbum=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/taylor.?s version/g,'').replace(/the anthology/g,'').replace(/deluxe version/g,'').replace(/[^a-z0-9]/g,'');
+const cleanTrack=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\(.*?version.*?\)/g,'').replace(/\(.*?from the vault.*?\)/g,'').replace(/[^a-z0-9]/g,'');
+const ratingKey=(albumId,index)=>`${albumId}|#${index+1}`;
+function findTrackIndex(albumId,title){
+  const album=ALBUMS.find(a=>a.id===albumId);
+  if(!album)return -1;
+  const wanted=cleanTrack(title);
+  let index=album.tracks.findIndex(track=>cleanTrack(track)===wanted);
+  if(index<0) index=album.tracks.findIndex(track=>{
+    const candidate=cleanTrack(track);
+    return candidate && wanted && (candidate.includes(wanted)||wanted.includes(candidate));
+  });
+  return index;
+}
+function canonicalizeRatingStore(store,updated={},deleted={}){
+  for(const key of Object.keys(store||{})){
+    const split=key.indexOf('|');
+    if(split<0 || key.slice(split+1).startsWith('#'))continue;
+    const albumId=key.slice(0,split);
+    const title=key.slice(split+1);
+    const index=findTrackIndex(albumId,title);
+    if(index<0)continue;
+    const canonical=ratingKey(albumId,index);
+    const oldTime=asTime(updated[key]);
+    const canonicalTime=asTime(updated[canonical]);
+    if(!store[canonical] || oldTime>=canonicalTime){
+      store[canonical]=store[key];
+      if(updated[key])updated[canonical]=updated[key];
+      if(deleted[key])deleted[canonical]=deleted[key];
+    }
+    delete store[key];
+    delete updated[key];
+    delete deleted[key];
+  }
+}
 
 function localPayload(){
   return {
@@ -67,10 +101,12 @@ function asTime(value){
   return Number.isFinite(t)?t:0;
 }
 function mergeRemotePayload(remote,rowUpdatedAt){
+  canonicalizeRatingStore(ratings,ratingUpdated,ratingDeleted);
   const remoteFallback=remote?.updatedAt||rowUpdatedAt||new Date(0).toISOString();
-  const remoteRatings=remote?.ratings||{};
-  const remoteUpdated=remote?.ratingUpdated||{};
-  const remoteDeleted=remote?.ratingDeleted||{};
+  const remoteRatings={...(remote?.ratings||{})};
+  const remoteUpdated={...(remote?.ratingUpdated||{})};
+  const remoteDeleted={...(remote?.ratingDeleted||{})};
+  canonicalizeRatingStore(remoteRatings,remoteUpdated,remoteDeleted);
   const keys=new Set([
     ...Object.keys(ratings),
     ...Object.keys(remoteRatings),
@@ -318,7 +354,7 @@ function album(){
         <span>#</span><span>Titre</span><span>Reliability</span><span>Lyrics</span><span>Voice</span><span>Production</span><span>Total</span>
       </div>
       ${a.tracks.map((t,i)=>{
-        const k=a.id+'|'+t,r=ratings[k]||[0,0,0,0],avg=r.some(Boolean)?r.reduce((x,y)=>x+y,0):'—';
+        const k=ratingKey(a.id,i),r=ratings[k]||[0,0,0,0],avg=r.some(Boolean)?r.reduce((x,y)=>x+y,0):'—';
         const isOpen=state.openTrack===k;
         return `<article class="track-mobile-card ${isOpen?'open':''}">
           <button class="track-mobile-summary" data-toggle-track="${k}" aria-expanded="${isOpen}">
@@ -341,8 +377,8 @@ function album(){
 }
 function ranking(){
   let rows=[];
-  for(const a of ALBUMS)for(const t of a.tracks){
-    let r=ratings[a.id+'|'+t];
+  for(const a of ALBUMS)for(const [i,t] of a.tracks.entries()){
+    let r=ratings[ratingKey(a.id,i)];
     if(r&&r.some(Boolean))rows.push({t,a:a.title,albumId:a.id,r,avg:r.reduce((x,y)=>x+y,0)});
   }
   if(state.rankAlbum!=='all') rows=rows.filter(x=>x.albumId===state.rankAlbum);
@@ -590,8 +626,13 @@ if(resetBtn){
   const album=ALBUMS.find(a=>a.id===resetBtn.dataset.resetAlbum);
   if(album && confirm(`Réinitialiser toutes les notes de « ${album.title} » ?`)){
     const deletedAt=new Date().toISOString();
-    album.tracks.forEach(track=>{
-      const key=album.id+'|'+track;
+    album.tracks.forEach((track,index)=>{
+      const key=ratingKey(album.id,index);
+      delete ratings[key];
+      delete ratingUpdated[key];
+      ratingDeleted[key]=deletedAt;
+    });
+    Object.keys(ratings).filter(key=>key.startsWith(album.id+'|')).forEach(key=>{
       delete ratings[key];
       delete ratingUpdated[key];
       ratingDeleted[key]=deletedAt;
@@ -759,5 +800,7 @@ supabaseClient.auth.onAuthStateChange((event,session)=>{
   if(accountEmail) accountEmail.textContent=currentUser.email||'Compte connecté';
   if(event==='SIGNED_IN' || event==='TOKEN_REFRESHED') refreshFromCloud();
 });
+canonicalizeRatingStore(ratings,ratingUpdated,ratingDeleted);
+persistLocalState();
 render();
 initAuth();
