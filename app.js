@@ -1,3 +1,12 @@
+
+window.addEventListener('error',event=>{
+  console.error('Runtime error',event.error||event.message);
+  const splash=document.querySelector('#authSplash');
+  if(splash && !splash.hidden){
+    const message=document.querySelector('#authMessage');
+    if(message) message.textContent="Une erreur est survenue. Recharge la page ; tes données locales sont conservées.";
+  }
+});
 const $=s=>document.querySelector(s), app=$('#app');
 const SUPABASE_URL='https://hohagbpmtrmofxmhaagn.supabase.co';
 const SUPABASE_KEY='sb_publishable_oas22oztrHU_izZWmm5m3A_UMYEdcC7';
@@ -138,7 +147,6 @@ async function syncBothWays({silent=false}={}){
     if(error) throw error;
     if(data?.data) mergeRemotePayload(data.data,data.updated_at);
     const ok=await pushToSupabase();
-    if(ok) render();
     return ok;
   }catch(error){
     console.error('Bidirectional sync error',error);
@@ -160,22 +168,38 @@ async function loadFromSupabase(){
 function scoreKey(type,count,level){return `${type}-${count}-${level}`}
 function updateBestScore(type,score,max){const key=scoreKey(type,state.count,state.level),prev=bestScores[key];if(!prev||score>prev.score){bestScores[key]={score,max,date:new Date().toISOString()};persistBestScores();scheduleSync();return true}return false}
 function renderBestScore(type){const rec=bestScores[scoreKey(type,state.count,state.level)];return rec?`<p class="best-score">Meilleur score : <b>${rec.score}/${rec.max}</b></p>`:''}
-async function initAuth(){const {data:{session}}=await supabaseClient.auth.getSession();currentUser=session?.user||null;if(!currentUser){$('#authSplash').hidden=false;return}$('#authSplash').hidden=true;await loadFromSupabase();render()}
-
-async function loadAlbumTracks(a){
-  if(catalogCache[a.id]?.length){a.tracks=catalogCache[a.id];return a.tracks}
+async function initAuth(){
+  const splash=$('#authSplash');
   try{
-    const term=encodeURIComponent(`${a.title} Taylor Swift`);
-    const search=await fetch(`https://itunes.apple.com/search?term=${term}&entity=album&limit=20`).then(r=>r.json());
-    const wanted=cleanAlbum(a.title);
-    let hit=search.results.find(x=>cleanAlbum(x.artistName).includes('taylorswift')&&cleanAlbum(x.collectionName)===wanted)
-      ||search.results.find(x=>cleanAlbum(x.artistName).includes('taylorswift')&&(cleanAlbum(x.collectionName).includes(wanted)||wanted.includes(cleanAlbum(x.collectionName))));
-    if(!hit) return a.tracks;
-    const lookup=await fetch(`https://itunes.apple.com/lookup?id=${hit.collectionId}&entity=song`).then(r=>r.json());
-    const found=lookup.results.filter(x=>x.wrapperType==='track'&&x.trackName).sort((x,y)=>(x.discNumber-y.discNumber)||(x.trackNumber-y.trackNumber)).map(x=>x.trackName);
-    if(found.length>=a.tracks.length){a.tracks=found;catalogCache[a.id]=found;localStorage.setItem('alienor-catalog-v2',JSON.stringify(catalogCache));}
-  }catch(e){}
-  return a.tracks;
+    const sessionPromise=supabaseClient.auth.getSession();
+    const timeoutPromise=new Promise(resolve=>setTimeout(()=>resolve({data:{session:null},timeout:true}),6000));
+    const response=await Promise.race([sessionPromise,timeoutPromise]);
+    const session=response?.data?.session||null;
+    currentUser=session?.user||null;
+
+    if(!currentUser){
+      splash.hidden=false;
+      setSyncStatus(response?.timeout?'Connexion au service indisponible':'Déconnecté');
+      return;
+    }
+
+    splash.hidden=true;
+    const accountEmail=$('#desktopAccountEmail');
+    if(accountEmail) accountEmail.textContent=currentUser.email||'Compte connecté';
+
+    // The interface is usable immediately. Synchronization continues in the background.
+    setSyncStatus('Synchronisation…');
+    syncBothWays({silent:true}).then(ok=>{
+      if(ok && !state.game) render();
+    }).catch(error=>{
+      console.error('Initial sync error',error);
+      setSyncStatus('Synchronisation différée');
+    });
+  }catch(error){
+    console.error('Authentication startup error',error);
+    splash.hidden=false;
+    setSyncStatus('Connexion au service indisponible');
+  }
 }
 async function ensureCatalog(){for(const a of ALBUMS) await loadAlbumTracks(a)}
 function generatedQuiz(){
@@ -643,12 +667,19 @@ $('#desktopSyncBtn').onclick=syncUserNow;
 $('#resetScoresBtn').onclick=resetAllScores;
 $('#desktopResetScoresBtn').onclick=resetAllScores;
 
-window.addEventListener('focus',()=>syncBothWays({silent:true}));
+async function refreshFromCloud(){
+  const ok=await syncBothWays({silent:true});
+  if(ok && !state.game) render();
+}
+window.addEventListener('focus',refreshFromCloud);
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible') syncBothWays({silent:true});
+  if(document.visibilityState==='visible') refreshFromCloud();
 });
-window.addEventListener('online',()=>syncBothWays());
-setInterval(()=>{if(document.visibilityState==='visible')syncBothWays({silent:true})},15000);
+window.addEventListener('online',refreshFromCloud);
+setInterval(()=>{
+  if(document.visibilityState==='visible' && !state.game) refreshFromCloud();
+},30000);
 
 supabaseClient.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null;if(!currentUser)setSyncStatus('Déconnecté')});
+render();
 initAuth();

@@ -187,3 +187,11 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 ## Correctif 2.3.1
 - Correction d’une erreur JavaScript au démarrage : la migration des anciennes notes était exécutée avant l’initialisation des variables de stockage.
 - Le site et les menus sont à nouveau fonctionnels.
+
+
+## Correctif 2.3.2
+- L’interface est rendue immédiatement, sans attendre Supabase.
+- La synchronisation initiale s’effectue en arrière-plan.
+- Un délai maximal empêche l’authentification de bloquer indéfiniment l’écran.
+- Les synchronisations automatiques ne rechargent plus une partie Quiz ou Blindtest en cours.
+- Réduction de la fréquence de vérification automatique à 30 secondes.
