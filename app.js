@@ -10,7 +10,14 @@ window.addEventListener('error',event=>{
 const $=s=>document.querySelector(s), app=$('#app');
 const SUPABASE_URL='https://hohagbpmtrmofxmhaagn.supabase.co';
 const SUPABASE_KEY='sb_publishable_oas22oztrHU_izZWmm5m3A_UMYEdcC7';
-const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
+  auth:{
+    persistSession:true,
+    autoRefreshToken:true,
+    detectSessionInUrl:true,
+    storage:window.localStorage
+  }
+});
 let currentUser=null,syncTimer=null;
 let bestScores=JSON.parse(localStorage.getItem('alienor-best-scores')||'{}');
 
@@ -21,11 +28,11 @@ let ratingDeleted=JSON.parse(localStorage.getItem('alienor-rating-deleted')||'{}
 let localUpdatedAt=localStorage.getItem('alienor-local-updated-at')||new Date(0).toISOString();
 
 if(Object.keys(ratings).length && !Object.keys(ratingUpdated).length){
-  const migratedAt=localUpdatedAt!==new Date(0).toISOString()?localUpdatedAt:new Date().toISOString();
-  Object.keys(ratings).forEach(key=>ratingUpdated[key]=migratedAt);
-  localUpdatedAt=migratedAt;
+  // Anciennes données sans horodatage : elles restent disponibles localement,
+  // mais une version cloud datée est prioritaire lors de la première fusion.
+  const legacyAt=new Date(0).toISOString();
+  Object.keys(ratings).forEach(key=>ratingUpdated[key]=legacyAt);
   localStorage.setItem('alienor-rating-updated',JSON.stringify(ratingUpdated));
-  localStorage.setItem('alienor-local-updated-at',localUpdatedAt);
 }
 const persistLocalState=()=>{
   localStorage.setItem('alienor-ratings',JSON.stringify(ratings));
@@ -105,7 +112,7 @@ function mergeRemotePayload(remote,rowUpdatedAt){
   const remoteTime=asTime(remoteFallback);
   const localTime=asTime(localUpdatedAt);
   if(remoteTime>localTime){
-    if(remote.theme) localStorage.setItem('alienor-theme',remote.theme);
+    if(remote.theme) setTheme(remote.theme,{sync:false});
     if(remote.preferences?.rankingView) state.rankingView=remote.preferences.rankingView;
     localUpdatedAt=remoteFallback;
   }
@@ -122,13 +129,12 @@ async function fetchRemoteRow(){
 async function pushToSupabase(){
   if(!currentUser) return false;
   setSyncStatus('Synchronisation…');
-  const now=new Date().toISOString();
-  localUpdatedAt=now;
   persistLocalState();
+  const serverUpdatedAt=new Date().toISOString();
   const {error}=await supabaseClient.from('user_data').upsert({
     user_id:currentUser.id,
     data:localPayload(),
-    updated_at:now
+    updated_at:serverUpdatedAt
   },{onConflict:'user_id'});
   if(error){
     console.error('Supabase sync error',error);
@@ -166,7 +172,17 @@ async function loadFromSupabase(){
   await syncBothWays();
 }
 function scoreKey(type,count,level){return `${type}-${count}-${level}`}
-function updateBestScore(type,score,max){const key=scoreKey(type,state.count,state.level),prev=bestScores[key];if(!prev||score>prev.score){bestScores[key]={score,max,date:new Date().toISOString()};persistBestScores();scheduleSync();return true}return false}
+function updateBestScore(type,score,max){
+  const key=scoreKey(type,state.count,state.level),prev=bestScores[key];
+  if(!prev||score>prev.score){
+    bestScores[key]={score,max,date:new Date().toISOString()};
+    persistBestScores();
+    touchLocal();
+    scheduleSync();
+    return true;
+  }
+  return false;
+}
 function renderBestScore(type){const rec=bestScores[scoreKey(type,state.count,state.level)];return rec?`<p class="best-score">Meilleur score : <b>${rec.score}/${rec.max}</b></p>`:''}
 async function initAuth(){
   const splash=$('#authSplash');
@@ -219,9 +235,10 @@ function generatedQuiz(){
 function go(route,data){state.route=route;if(data)Object.assign(state,data);render();scrollTo(0,0)}
 document.addEventListener('click',async e=>{const r=e.target.closest('[data-route]');if(!r)return;closeMobileMenu();if(r.dataset.route==='album'&&r.dataset.album){const a=ALBUMS.find(x=>x.id===r.dataset.album);go('album',{album:r.dataset.album});await loadAlbumTracks(a);render();return}go(r.dataset.route,{album:r.dataset.album||null})});
 $('#themeBtn').onclick=()=>$('#themeDialog').showModal();$('.close').onclick=()=>$('#themeDialog').close();
-function setTheme(name){
+function setTheme(name,{sync=true}={}){
   document.documentElement.dataset.theme=name;
-  localStorage.setItem('alienor-theme',name);touchLocal();scheduleSync();
+  localStorage.setItem('alienor-theme',name);
+  if(sync){touchLocal();scheduleSync()}
   document.querySelectorAll('[data-quick-theme]').forEach(b=>b.classList.toggle('active',b.dataset.quickTheme===name));
 }
 document.querySelectorAll('#themeDialog button[data-theme]').forEach(b=>b.onclick=(e)=>{
@@ -230,7 +247,7 @@ document.querySelectorAll('#themeDialog button[data-theme]').forEach(b=>b.onclic
   setTheme(b.dataset.theme);
   $('#themeDialog').close();
 });
-setTheme(localStorage.getItem('alienor-theme')||'soft-summer');
+setTheme(localStorage.getItem('alienor-theme')||'soft-summer',{sync:false});
 
 const burgerBtn=$('#burgerBtn'), mobileMenu=$('#mobileMenu'), mobileBackdrop=$('#mobileMenuBackdrop');
 function openMobileMenu(){
@@ -640,7 +657,57 @@ document.addEventListener('change',e=>{
   if(e.target.id==='rankDir'){state.rankDir=e.target.value;render()}
 });
 
-$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#authMessage').textContent='Connexion…';const {data,error}=await supabaseClient.auth.signInWithPassword({email:$('#loginEmail').value.trim(),password:$('#loginPassword').value});if(error){$('#authMessage').textContent='Identifiant ou mot de passe incorrect.';return}currentUser=data.user;$('#authSplash').hidden=true;const accountEmail=$('#desktopAccountEmail');if(accountEmail)accountEmail.textContent=currentUser.email||'Compte connecté';await loadFromSupabase();render()});
+$('#loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const message=$('#authMessage');
+  const submit=e.currentTarget.querySelector('button[type="submit"]');
+  const email=$('#loginEmail').value.trim().toLowerCase();
+  const password=$('#loginPassword').value;
+
+  if(!email || !password){
+    message.textContent='Saisis ton adresse e-mail et ton mot de passe.';
+    return;
+  }
+
+  message.textContent='Connexion…';
+  if(submit) submit.disabled=true;
+
+  try{
+    const authRequest=supabaseClient.auth.signInWithPassword({email,password});
+    const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('AUTH_TIMEOUT')),12000));
+    const {data,error}=await Promise.race([authRequest,timeout]);
+
+    if(error) throw error;
+    currentUser=data?.user||data?.session?.user||null;
+    if(!currentUser) throw new Error('SESSION_MISSING');
+
+    $('#authSplash').hidden=true;
+    const accountEmail=$('#desktopAccountEmail');
+    if(accountEmail) accountEmail.textContent=currentUser.email||'Compte connecté';
+    message.textContent='';
+    render();
+    setSyncStatus('Synchronisation…');
+
+    // La connexion est terminée ; le cloud ne bloque plus l’ouverture du site.
+    syncBothWays({silent:true}).then(ok=>{
+      if(ok && !state.game) render();
+    }).catch(error=>{
+      console.error('Post-login sync error',error);
+      setSyncStatus('Synchronisation différée');
+    });
+  }catch(error){
+    console.error('Login error',error);
+    if(error?.message==='AUTH_TIMEOUT'){
+      message.textContent='La connexion prend trop de temps. Vérifie Internet puis réessaie.';
+    }else if(error?.message?.toLowerCase().includes('invalid login credentials')){
+      message.textContent='Adresse e-mail ou mot de passe incorrect.';
+    }else{
+      message.textContent='Connexion impossible pour le moment. Réessaie dans quelques secondes.';
+    }
+  }finally{
+    if(submit) submit.disabled=false;
+  }
+});
 $('#forgotPassword').onclick=async()=>{const email=$('#loginEmail').value.trim();if(!email){$('#authMessage').textContent='Saisis d’abord ton adresse e-mail.';return}const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});$('#authMessage').textContent=error?'Impossible d’envoyer le lien.':'Un lien de réinitialisation a été envoyé.'};
 async function logoutUser(){await supabaseClient.auth.signOut();currentUser=null;closeMobileMenu();closeAccountMenu();$('#authSplash').hidden=false}
 async function syncUserNow(){
@@ -680,6 +747,17 @@ setInterval(()=>{
   if(document.visibilityState==='visible' && !state.game) refreshFromCloud();
 },30000);
 
-supabaseClient.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null;if(!currentUser)setSyncStatus('Déconnecté')});
+supabaseClient.auth.onAuthStateChange((event,session)=>{
+  currentUser=session?.user||null;
+  if(!currentUser){
+    setSyncStatus('Déconnecté');
+    return;
+  }
+  const splash=$('#authSplash');
+  if(splash) splash.hidden=true;
+  const accountEmail=$('#desktopAccountEmail');
+  if(accountEmail) accountEmail.textContent=currentUser.email||'Compte connecté';
+  if(event==='SIGNED_IN' || event==='TOKEN_REFRESHED') refreshFromCloud();
+});
 render();
 initAuth();

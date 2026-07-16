@@ -195,3 +195,14 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Un délai maximal empêche l’authentification de bloquer indéfiniment l’écran.
 - Les synchronisations automatiques ne rechargent plus une partie Quiz ou Blindtest en cours.
 - Réduction de la fréquence de vérification automatique à 30 secondes.
+
+
+## Version 2.4 — connexion Mac et synchronisation
+- Authentification Supabase explicitement persistante dans le stockage local du navigateur.
+- La connexion ne reste plus bloquée en attendant la synchronisation.
+- Délai de sécurité et messages d’erreur plus précis sur l’écran de connexion.
+- Correction des anciennes notes locales qui étaient artificiellement datées au moment du chargement.
+- Le simple chargement du thème ne modifie plus la date des données locales.
+- Une synchronisation sans modification ne fabrique plus une nouvelle modification locale.
+- Récupération automatique lors de la restauration ou du renouvellement de session.
+- Ajout d’un numéro de version aux fichiers JavaScript et CSS pour empêcher Chrome d’utiliser une ancienne copie en cache.
