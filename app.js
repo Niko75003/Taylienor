@@ -4,19 +4,159 @@ const SUPABASE_KEY='sb_publishable_oas22oztrHU_izZWmm5m3A_UMYEdcC7';
 const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 let currentUser=null,syncTimer=null;
 let bestScores=JSON.parse(localStorage.getItem('alienor-best-scores')||'{}');
+
+if(Object.keys(ratings).length && !Object.keys(ratingUpdated).length){
+  const migratedAt=localUpdatedAt!==new Date(0).toISOString()?localUpdatedAt:new Date().toISOString();
+  Object.keys(ratings).forEach(key=>ratingUpdated[key]=migratedAt);
+  localUpdatedAt=migratedAt;
+  localStorage.setItem('alienor-rating-updated',JSON.stringify(ratingUpdated));
+  localStorage.setItem('alienor-local-updated-at',localUpdatedAt);
+}
+
 const state={route:'home',album:null,count:10,level:'normal',game:null,rankSort:'avg',rankDir:'desc',rankAlbum:'all',rankingView:'simple',openTrack:null};
 const ratings=JSON.parse(localStorage.getItem('alienor-ratings')||'{}');
-const save=()=>{localStorage.setItem('alienor-ratings',JSON.stringify(ratings));scheduleSync()};
+let ratingUpdated=JSON.parse(localStorage.getItem('alienor-rating-updated')||'{}');
+let ratingDeleted=JSON.parse(localStorage.getItem('alienor-rating-deleted')||'{}');
+let localUpdatedAt=localStorage.getItem('alienor-local-updated-at')||new Date(0).toISOString();
+const persistLocalState=()=>{
+  localStorage.setItem('alienor-ratings',JSON.stringify(ratings));
+  localStorage.setItem('alienor-rating-updated',JSON.stringify(ratingUpdated));
+  localStorage.setItem('alienor-rating-deleted',JSON.stringify(ratingDeleted));
+  localStorage.setItem('alienor-local-updated-at',localUpdatedAt);
+};
+const touchLocal=()=>{
+  localUpdatedAt=new Date().toISOString();
+  persistLocalState();
+};
+const save=()=>{touchLocal();scheduleSync()};
 const allTracks=()=>ALBUMS.flatMap(a=>a.tracks.map((t,i)=>({title:t,album:a.title,albumId:a.id,track:i+1})));
 const catalogCache=JSON.parse(localStorage.getItem('alienor-catalog-v2')||'{}');
 const cleanAlbum=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/taylor.?s version/g,'').replace(/the anthology/g,'').replace(/deluxe version/g,'').replace(/[^a-z0-9]/g,'');
 
-function localPayload(){return {ratings,bestScores,theme:localStorage.getItem('alienor-theme')||'soft-summer',preferences:{rankingView:state.rankingView||'simple'},updatedAt:new Date().toISOString()}}
+function localPayload(){
+  return {
+    ratings,
+    ratingUpdated,
+    ratingDeleted,
+    bestScores,
+    theme:localStorage.getItem('alienor-theme')||'soft-summer',
+    preferences:{rankingView:state.rankingView||'simple'},
+    updatedAt:localUpdatedAt
+  };
+}
 function persistBestScores(){localStorage.setItem('alienor-best-scores',JSON.stringify(bestScores))}
-function setSyncStatus(text){const el=$('#syncStatus');if(el)el.textContent=text}
-async function pushToSupabase(){if(!currentUser)return false;setSyncStatus('Synchronisation…');const {error}=await supabaseClient.from('user_data').upsert({user_id:currentUser.id,data:localPayload(),updated_at:new Date().toISOString()},{onConflict:'user_id'});if(error){setSyncStatus('Erreur de synchronisation');return false}setSyncStatus('Synchronisé à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));return true}
-function scheduleSync(){if(!currentUser)return;clearTimeout(syncTimer);syncTimer=setTimeout(pushToSupabase,1200)}
-async function loadFromSupabase(){if(!currentUser)return;const {data,error}=await supabaseClient.from('user_data').select('data').eq('user_id',currentUser.id).maybeSingle();if(error){setSyncStatus('Erreur de chargement');return}if(data?.data){const remote=data.data;if(remote.ratings){Object.keys(ratings).forEach(k=>delete ratings[k]);Object.assign(ratings,remote.ratings);localStorage.setItem('alienor-ratings',JSON.stringify(ratings))}if(remote.bestScores){bestScores=remote.bestScores;persistBestScores()}if(remote.theme)setTheme(remote.theme);if(remote.preferences?.rankingView)state.rankingView=remote.preferences.rankingView}else await pushToSupabase()}
+function setSyncStatus(text){const mobile=$('#syncStatus'),desktop=$('#desktopSyncStatus');if(mobile)mobile.textContent=text;if(desktop)desktop.textContent=text}
+function asTime(value){
+  const t=Date.parse(value||'');
+  return Number.isFinite(t)?t:0;
+}
+function mergeRemotePayload(remote,rowUpdatedAt){
+  const remoteFallback=remote?.updatedAt||rowUpdatedAt||new Date(0).toISOString();
+  const remoteRatings=remote?.ratings||{};
+  const remoteUpdated=remote?.ratingUpdated||{};
+  const remoteDeleted=remote?.ratingDeleted||{};
+  const keys=new Set([
+    ...Object.keys(ratings),
+    ...Object.keys(remoteRatings),
+    ...Object.keys(ratingDeleted),
+    ...Object.keys(remoteDeleted)
+  ]);
+
+  for(const key of keys){
+    const localChange=asTime(ratingUpdated[key]||localUpdatedAt);
+    const localDelete=asTime(ratingDeleted[key]);
+    const remoteChange=asTime(remoteUpdated[key]||remoteFallback);
+    const remoteDelete=asTime(remoteDeleted[key]);
+
+    const newest=Math.max(localChange,localDelete,remoteChange,remoteDelete);
+    if(newest===remoteDelete && remoteDelete>0){
+      delete ratings[key];
+      delete ratingUpdated[key];
+      ratingDeleted[key]=remoteDeleted[key];
+    }else if(newest===localDelete && localDelete>0){
+      delete ratings[key];
+      delete ratingUpdated[key];
+    }else if(newest===remoteChange && remoteRatings[key]){
+      ratings[key]=remoteRatings[key];
+      ratingUpdated[key]=remoteUpdated[key]||remoteFallback;
+      delete ratingDeleted[key];
+    }else if(ratings[key]){
+      delete ratingDeleted[key];
+    }
+  }
+
+  if(remote?.bestScores){
+    for(const [key,value] of Object.entries(remote.bestScores)){
+      const local=bestScores[key];
+      if(!local || Number(value.score)>Number(local.score)) bestScores[key]=value;
+    }
+    persistBestScores();
+  }
+
+  const remoteTime=asTime(remoteFallback);
+  const localTime=asTime(localUpdatedAt);
+  if(remoteTime>localTime){
+    if(remote.theme) localStorage.setItem('alienor-theme',remote.theme);
+    if(remote.preferences?.rankingView) state.rankingView=remote.preferences.rankingView;
+    localUpdatedAt=remoteFallback;
+  }
+
+  persistLocalState();
+}
+async function fetchRemoteRow(){
+  if(!currentUser) return {data:null,error:null};
+  return await supabaseClient.from('user_data')
+    .select('data, updated_at')
+    .eq('user_id',currentUser.id)
+    .maybeSingle();
+}
+async function pushToSupabase(){
+  if(!currentUser) return false;
+  setSyncStatus('Synchronisation…');
+  const now=new Date().toISOString();
+  localUpdatedAt=now;
+  persistLocalState();
+  const {error}=await supabaseClient.from('user_data').upsert({
+    user_id:currentUser.id,
+    data:localPayload(),
+    updated_at:now
+  },{onConflict:'user_id'});
+  if(error){
+    console.error('Supabase sync error',error);
+    setSyncStatus('Erreur de synchronisation');
+    return false;
+  }
+  setSyncStatus('Synchronisé à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));
+  return true;
+}
+async function syncBothWays({silent=false}={}){
+  if(!currentUser || window.__syncInProgress) return false;
+  window.__syncInProgress=true;
+  if(!silent) setSyncStatus('Synchronisation…');
+  try{
+    const {data,error}=await fetchRemoteRow();
+    if(error) throw error;
+    if(data?.data) mergeRemotePayload(data.data,data.updated_at);
+    const ok=await pushToSupabase();
+    if(ok) render();
+    return ok;
+  }catch(error){
+    console.error('Bidirectional sync error',error);
+    setSyncStatus('Erreur de synchronisation');
+    return false;
+  }finally{
+    window.__syncInProgress=false;
+  }
+}
+function scheduleSync(){
+  if(!currentUser) return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>syncBothWays({silent:true}),900);
+}
+async function loadFromSupabase(){
+  if(!currentUser) return;
+  await syncBothWays();
+}
 function scoreKey(type,count,level){return `${type}-${count}-${level}`}
 function updateBestScore(type,score,max){const key=scoreKey(type,state.count,state.level),prev=bestScores[key];if(!prev||score>prev.score){bestScores[key]={score,max,date:new Date().toISOString()};persistBestScores();scheduleSync();return true}return false}
 function renderBestScore(type){const rec=bestScores[scoreKey(type,state.count,state.level)];return rec?`<p class="best-score">Meilleur score : <b>${rec.score}/${rec.max}</b></p>`:''}
@@ -57,7 +197,7 @@ document.addEventListener('click',async e=>{const r=e.target.closest('[data-rout
 $('#themeBtn').onclick=()=>$('#themeDialog').showModal();$('.close').onclick=()=>$('#themeDialog').close();
 function setTheme(name){
   document.documentElement.dataset.theme=name;
-  localStorage.setItem('alienor-theme',name);scheduleSync();
+  localStorage.setItem('alienor-theme',name);touchLocal();scheduleSync();
   document.querySelectorAll('[data-quick-theme]').forEach(b=>b.classList.toggle('active',b.dataset.quickTheme===name));
 }
 document.querySelectorAll('#themeDialog button[data-theme]').forEach(b=>b.onclick=(e)=>{
@@ -390,7 +530,12 @@ if(resetAllBtn){
   if(!first) return;
   const second=confirm('Dernière confirmation : toutes les notes seront définitivement supprimées de ce navigateur. Continuer ?');
   if(second){
-    Object.keys(ratings).forEach(key=>delete ratings[key]);
+    const deletedAt=new Date().toISOString();
+    Object.keys(ratings).forEach(key=>{
+      delete ratings[key];
+      delete ratingUpdated[key];
+      ratingDeleted[key]=deletedAt;
+    });
     save();
     state.rankAlbum='all';
     state.rankSort='avg';
@@ -403,7 +548,13 @@ const resetBtn=e.target.closest('[data-reset-album]');
 if(resetBtn){
   const album=ALBUMS.find(a=>a.id===resetBtn.dataset.resetAlbum);
   if(album && confirm(`Réinitialiser toutes les notes de « ${album.title} » ?`)){
-    album.tracks.forEach(track=>delete ratings[album.id+'|'+track]);
+    const deletedAt=new Date().toISOString();
+    album.tracks.forEach(track=>{
+      const key=album.id+'|'+track;
+      delete ratings[key];
+      delete ratingUpdated[key];
+      ratingDeleted[key]=deletedAt;
+    });
     save();
     render();
   }
@@ -418,11 +569,20 @@ if(trackToggle){
 const viewBtn=e.target.closest('[data-ranking-view]');
 if(viewBtn){
   state.rankingView=viewBtn.dataset.rankingView;
+  touchLocal();
   scheduleSync();
   render();
   return;
 }
-let b=e.target.closest('[data-rate]');if(b){let k=b.dataset.rate,c=+b.dataset.crit,v=+b.dataset.value;ratings[k]=ratings[k]||[0,0,0,0];ratings[k][c]=(v===1&&ratings[k][c]===1)?0:v;save();render()}if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();if(e.target.closest('.play')&&state.game.audio){
+let b=e.target.closest('[data-rate]');if(b){
+  let k=b.dataset.rate,c=+b.dataset.crit,v=+b.dataset.value;
+  ratings[k]=ratings[k]||[0,0,0,0];
+  ratings[k][c]=(v===1&&ratings[k][c]===1)?0:v;
+  ratingUpdated[k]=new Date().toISOString();
+  delete ratingDeleted[k];
+  save();
+  render();
+}if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();if(e.target.closest('.play')&&state.game.audio){
   state.game.audio.currentTime=state.level==='hard'?8:state.level==='easy'?0:4;
   state.game.audio.play();
   clearTimeout(state.game.pauseTimer);
@@ -459,7 +619,10 @@ document.addEventListener('change',e=>{
 $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();$('#authMessage').textContent='Connexion…';const {data,error}=await supabaseClient.auth.signInWithPassword({email:$('#loginEmail').value.trim(),password:$('#loginPassword').value});if(error){$('#authMessage').textContent='Identifiant ou mot de passe incorrect.';return}currentUser=data.user;$('#authSplash').hidden=true;const accountEmail=$('#desktopAccountEmail');if(accountEmail)accountEmail.textContent=currentUser.email||'Compte connecté';await loadFromSupabase();render()});
 $('#forgotPassword').onclick=async()=>{const email=$('#loginEmail').value.trim();if(!email){$('#authMessage').textContent='Saisis d’abord ton adresse e-mail.';return}const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});$('#authMessage').textContent=error?'Impossible d’envoyer le lien.':'Un lien de réinitialisation a été envoyé.'};
 async function logoutUser(){await supabaseClient.auth.signOut();currentUser=null;closeMobileMenu();closeAccountMenu();$('#authSplash').hidden=false}
-async function syncUserNow(){await pushToSupabase();showSyncToast('Données synchronisées')}
+async function syncUserNow(){
+  const ok=await syncBothWays();
+  if(ok) showSyncToast('Données synchronisées');
+}
 
 function resetAllScores(){
   const first=confirm('Réinitialiser tous les meilleurs scores du Quiz et du Blindtest ?');
@@ -468,6 +631,7 @@ function resetAllScores(){
   if(!second)return;
   bestScores={};
   persistBestScores();
+  touchLocal();
   scheduleSync();
   showSyncToast('Tous les scores ont été réinitialisés');
   render();
@@ -478,5 +642,13 @@ $('#syncNowBtn').onclick=syncUserNow;
 $('#desktopSyncBtn').onclick=syncUserNow;
 $('#resetScoresBtn').onclick=resetAllScores;
 $('#desktopResetScoresBtn').onclick=resetAllScores;
-supabaseClient.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null});
+
+window.addEventListener('focus',()=>syncBothWays({silent:true}));
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') syncBothWays({silent:true});
+});
+window.addEventListener('online',()=>syncBothWays());
+setInterval(()=>{if(document.visibilityState==='visible')syncBothWays({silent:true})},15000);
+
+supabaseClient.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null;if(!currentUser)setSyncStatus('Déconnecté')});
 initAuth();

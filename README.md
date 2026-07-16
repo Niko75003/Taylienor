@@ -168,3 +168,17 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Ajout de la mention « Made with love. Happy birthday. » dans les menus compte et sur l’écran de connexion.
 - Phrases de réussite et d’échec randomisées dans Quiz et Blindtest.
 - Barème du blindtest transformé en trois pastilles graphiques.
+
+
+## Version 2.2
+- Correction du statut de synchronisation sur desktop.
+- Affichage de l’heure de la dernière synchronisation réussie.
+
+
+## Version 2.3 — synchronisation multi-appareils fiable
+- Synchronisation désormais bidirectionnelle : chaque appareil récupère les données distantes avant d’envoyer ses changements.
+- Fusion des notes morceau par morceau grâce à une date de modification propre à chaque notation.
+- Les suppressions et réinitialisations sont synchronisées avec des marqueurs de suppression.
+- Vérification automatique au retour sur l’onglet, au retour en ligne et toutes les 15 secondes lorsque le site est visible.
+- Le bouton « Synchroniser maintenant » récupère et fusionne les changements avant l’envoi.
+- Les meilleurs scores sont fusionnés en conservant le score le plus élevé.
