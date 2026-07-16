@@ -56,7 +56,7 @@ const allTracks=()=>ALBUMS.flatMap(a=>a.tracks.map((t,i)=>({title:t,album:a.titl
 const catalogCache=JSON.parse(localStorage.getItem('alienor-catalog-v2')||'{}');
 const cleanAlbum=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/taylor.?s version/g,'').replace(/the anthology/g,'').replace(/deluxe version/g,'').replace(/[^a-z0-9]/g,'');
 const cleanTrack=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\(.*?version.*?\)/g,'').replace(/\(.*?from the vault.*?\)/g,'').replace(/[^a-z0-9]/g,'');
-const trackId=(albumId,index)=>TRACK_IDS[`${albumId}:${index+1}`]||`track_${albumId}_${String(index+1).padStart(2,'0')}`;
+const trackId=(albumId,index)=>`track_${albumId}_${String(index+1).padStart(2,'0')}`;
 const ratingKey=(albumId,index)=>trackId(albumId,index);
 function findTrackIndex(albumId,title){
   const album=ALBUMS.find(a=>a.id===albumId);
@@ -69,7 +69,42 @@ function findTrackIndex(albumId,title){
   });
   return index;
 }
-function canonicalizeRatingStore(store,updated={}
+function canonicalizeRatingStore(store,updated={},deleted={},cellUpdated={}){
+  for(const key of Object.keys(store||{})){
+    if(key.startsWith('track_'))continue;
+    let albumId=null;
+    let index=-1;
+
+    const numbered=key.match(/^([^|]+)\|#(\d+)$/);
+    if(numbered){
+      albumId=numbered[1];
+      index=Number(numbered[2])-1;
+    }else{
+      const split=key.indexOf('|');
+      if(split>=0){
+        albumId=key.slice(0,split);
+        index=findTrackIndex(albumId,key.slice(split+1));
+      }
+    }
+
+    if(!albumId || index<0)continue;
+    const canonical=ratingKey(albumId,index);
+    const oldTime=asTime(updated[key]);
+    const canonicalTime=asTime(updated[canonical]);
+
+    if(!store[canonical] || oldTime>=canonicalTime){
+      store[canonical]=store[key];
+      if(updated[key])updated[canonical]=updated[key];
+      if(deleted[key])deleted[canonical]=deleted[key];
+      if(cellUpdated[key])cellUpdated[canonical]=cellUpdated[key];
+    }
+
+    delete store[key];
+    delete updated[key];
+    delete deleted[key];
+    delete cellUpdated[key];
+  }
+}
 
 function localPayload(){
   return {
@@ -277,7 +312,6 @@ async function initAuth(){
   }
 }
 async function loadAlbumTracks(album){
-  // Le catalogue local est la source de vérité. iTunes sert uniquement aux extraits audio.
   return album?.tracks||[];
 }
 async function ensureCatalog(){return ALBUMS}
@@ -661,9 +695,7 @@ if(resetBtn){
       delete ratingCellUpdated[key];
       ratingDeleted[key]=deletedAt;
     });
-    Object.keys(ratings).filter(key=>
-      key.startsWith(album.id+'|') || key.startsWith(`track_${album.id}_`)
-    ).forEach(key=>{
+    Object.keys(ratings).filter(key=>key.startsWith(album.id+'|')||key.startsWith(`track_${album.id}_`)).forEach(key=>{
       delete ratings[key];
       delete ratingUpdated[key];
       delete ratingCellUpdated[key];

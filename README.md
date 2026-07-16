@@ -224,8 +224,14 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 
 
 ## Version 2.7 — identifiant unique par piste
-- Attribution d’un identifiant interne immuable à chacune des pistes du catalogue.
-- Migration automatique des anciennes clés par titre ou par numéro de piste.
-- Les notes ne dépendent plus d’iTunes, du titre affiché, du navigateur ou du domaine.
-- Le catalogue local devient la source de vérité ; iTunes reste utilisé uniquement pour trouver les extraits audio.
-- Correction du chargement des pages album dans la base 2.6.
+- 248 pistes dotées d’un identifiant interne immuable.
+- Migration automatique des anciennes clés par titre ou numéro de piste.
+- Le catalogue local est la source de vérité ; iTunes ne sert qu’aux extraits audio.
+- Les notes restent fusionnées critère par critère.
+
+
+## Version 2.7.1 — correctif de démarrage et connexion
+- Suppression de la dépendance de `app.js` à la table `TRACK_IDS` de `data.js`.
+- Les identifiants uniques sont désormais produits directement à partir de l’identifiant immuable de l’album et du rang canonique de la piste.
+- Le site démarre même si un navigateur possède encore une ancienne copie de `data.js`.
+- Nouveau cache-busting `2.7.1` pour forcer le rechargement des scripts.
