@@ -213,3 +213,19 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Chaque note utilise désormais une clé stable composée de l’album et du numéro de piste.
 - Migration automatique des anciennes notes locales et distantes vers le nouveau format.
 - Les classements deviennent cohérents entre mobile, Chrome, Safari et les différents domaines.
+
+
+## Version 2.6 — fusion critère par critère
+- Chaque critère de notation possède désormais son propre horodatage.
+- Une modification de « Lyrics » sur mobile ne remplace plus « Voice » ou « Production » modifiés sur desktop.
+- Migration automatique des anciennes notes par morceau vers le nouveau format.
+- Les suppressions restent prioritaires uniquement lorsqu’elles sont réellement plus récentes que toutes les notes.
+- Le bouton « Synchroniser maintenant » recharge immédiatement l’affichage après fusion.
+
+
+## Version 2.7 — identifiant unique par piste
+- Attribution d’un identifiant interne immuable à chacune des pistes du catalogue.
+- Migration automatique des anciennes clés par titre ou par numéro de piste.
+- Les notes ne dépendent plus d’iTunes, du titre affiché, du navigateur ou du domaine.
+- Le catalogue local devient la source de vérité ; iTunes reste utilisé uniquement pour trouver les extraits audio.
+- Correction du chargement des pages album dans la base 2.6.

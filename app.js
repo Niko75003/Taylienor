@@ -24,19 +24,26 @@ let bestScores=JSON.parse(localStorage.getItem('alienor-best-scores')||'{}');
 const state={route:'home',album:null,count:10,level:'normal',game:null,rankSort:'avg',rankDir:'desc',rankAlbum:'all',rankingView:'simple',openTrack:null};
 const ratings=JSON.parse(localStorage.getItem('alienor-ratings')||'{}');
 let ratingUpdated=JSON.parse(localStorage.getItem('alienor-rating-updated')||'{}');
+let ratingCellUpdated=JSON.parse(localStorage.getItem('alienor-rating-cell-updated')||'{}');
 let ratingDeleted=JSON.parse(localStorage.getItem('alienor-rating-deleted')||'{}');
 let localUpdatedAt=localStorage.getItem('alienor-local-updated-at')||new Date(0).toISOString();
 
 if(Object.keys(ratings).length && !Object.keys(ratingUpdated).length){
-  // Anciennes données sans horodatage : elles restent disponibles localement,
-  // mais une version cloud datée est prioritaire lors de la première fusion.
   const legacyAt=new Date(0).toISOString();
   Object.keys(ratings).forEach(key=>ratingUpdated[key]=legacyAt);
   localStorage.setItem('alienor-rating-updated',JSON.stringify(ratingUpdated));
 }
+if(!Object.keys(ratingCellUpdated).length){
+  for(const [key,values] of Object.entries(ratings)){
+    const stamp=ratingUpdated[key]||new Date(0).toISOString();
+    ratingCellUpdated[key]=Array.from({length:4},(_,i)=>values?.[i]!==undefined?stamp:new Date(0).toISOString());
+  }
+  localStorage.setItem('alienor-rating-cell-updated',JSON.stringify(ratingCellUpdated));
+}
 const persistLocalState=()=>{
   localStorage.setItem('alienor-ratings',JSON.stringify(ratings));
   localStorage.setItem('alienor-rating-updated',JSON.stringify(ratingUpdated));
+  localStorage.setItem('alienor-rating-cell-updated',JSON.stringify(ratingCellUpdated));
   localStorage.setItem('alienor-rating-deleted',JSON.stringify(ratingDeleted));
   localStorage.setItem('alienor-local-updated-at',localUpdatedAt);
 };
@@ -49,7 +56,8 @@ const allTracks=()=>ALBUMS.flatMap(a=>a.tracks.map((t,i)=>({title:t,album:a.titl
 const catalogCache=JSON.parse(localStorage.getItem('alienor-catalog-v2')||'{}');
 const cleanAlbum=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/taylor.?s version/g,'').replace(/the anthology/g,'').replace(/deluxe version/g,'').replace(/[^a-z0-9]/g,'');
 const cleanTrack=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\(.*?version.*?\)/g,'').replace(/\(.*?from the vault.*?\)/g,'').replace(/[^a-z0-9]/g,'');
-const ratingKey=(albumId,index)=>`${albumId}|#${index+1}`;
+const trackId=(albumId,index)=>TRACK_IDS[`${albumId}:${index+1}`]||`track_${albumId}_${String(index+1).padStart(2,'0')}`;
+const ratingKey=(albumId,index)=>trackId(albumId,index);
 function findTrackIndex(albumId,title){
   const album=ALBUMS.find(a=>a.id===albumId);
   if(!album)return -1;
@@ -61,37 +69,19 @@ function findTrackIndex(albumId,title){
   });
   return index;
 }
-function canonicalizeRatingStore(store,updated={},deleted={}){
-  for(const key of Object.keys(store||{})){
-    const split=key.indexOf('|');
-    if(split<0 || key.slice(split+1).startsWith('#'))continue;
-    const albumId=key.slice(0,split);
-    const title=key.slice(split+1);
-    const index=findTrackIndex(albumId,title);
-    if(index<0)continue;
-    const canonical=ratingKey(albumId,index);
-    const oldTime=asTime(updated[key]);
-    const canonicalTime=asTime(updated[canonical]);
-    if(!store[canonical] || oldTime>=canonicalTime){
-      store[canonical]=store[key];
-      if(updated[key])updated[canonical]=updated[key];
-      if(deleted[key])deleted[canonical]=deleted[key];
-    }
-    delete store[key];
-    delete updated[key];
-    delete deleted[key];
-  }
-}
+function canonicalizeRatingStore(store,updated={}
 
 function localPayload(){
   return {
     ratings,
     ratingUpdated,
+    ratingCellUpdated,
     ratingDeleted,
     bestScores,
     theme:localStorage.getItem('alienor-theme')||'soft-summer',
     preferences:{rankingView:state.rankingView||'simple'},
-    updatedAt:localUpdatedAt
+    updatedAt:localUpdatedAt,
+    schemaVersion:4
   };
 }
 function persistBestScores(){localStorage.setItem('alienor-best-scores',JSON.stringify(bestScores))}
@@ -101,12 +91,16 @@ function asTime(value){
   return Number.isFinite(t)?t:0;
 }
 function mergeRemotePayload(remote,rowUpdatedAt){
-  canonicalizeRatingStore(ratings,ratingUpdated,ratingDeleted);
+  canonicalizeRatingStore(ratings,ratingUpdated,ratingDeleted,ratingCellUpdated);
+
   const remoteFallback=remote?.updatedAt||rowUpdatedAt||new Date(0).toISOString();
   const remoteRatings={...(remote?.ratings||{})};
   const remoteUpdated={...(remote?.ratingUpdated||{})};
+  const remoteCellUpdated={...(remote?.ratingCellUpdated||{})};
   const remoteDeleted={...(remote?.ratingDeleted||{})};
-  canonicalizeRatingStore(remoteRatings,remoteUpdated,remoteDeleted);
+
+  canonicalizeRatingStore(remoteRatings,remoteUpdated,remoteDeleted,remoteCellUpdated);
+
   const keys=new Set([
     ...Object.keys(ratings),
     ...Object.keys(remoteRatings),
@@ -115,26 +109,55 @@ function mergeRemotePayload(remote,rowUpdatedAt){
   ]);
 
   for(const key of keys){
-    const localChange=asTime(ratingUpdated[key]||localUpdatedAt);
     const localDelete=asTime(ratingDeleted[key]);
-    const remoteChange=asTime(remoteUpdated[key]||remoteFallback);
     const remoteDelete=asTime(remoteDeleted[key]);
 
-    const newest=Math.max(localChange,localDelete,remoteChange,remoteDelete);
-    if(newest===remoteDelete && remoteDelete>0){
+    const localValues=Array.isArray(ratings[key])?[...ratings[key]]:[0,0,0,0];
+    const remoteValues=Array.isArray(remoteRatings[key])?[...remoteRatings[key]]:[0,0,0,0];
+
+    const localCells=Array.isArray(ratingCellUpdated[key])
+      ? [...ratingCellUpdated[key]]
+      : Array.from({length:4},()=>ratingUpdated[key]||new Date(0).toISOString());
+
+    const remoteCells=Array.isArray(remoteCellUpdated[key])
+      ? [...remoteCellUpdated[key]]
+      : Array.from({length:4},()=>remoteUpdated[key]||remoteFallback);
+
+    const newestCell=Math.max(
+      ...localCells.map(asTime),
+      ...remoteCells.map(asTime)
+    );
+
+    const newestDelete=Math.max(localDelete,remoteDelete);
+
+    if(newestDelete>newestCell){
       delete ratings[key];
       delete ratingUpdated[key];
-      ratingDeleted[key]=remoteDeleted[key];
-    }else if(newest===localDelete && localDelete>0){
-      delete ratings[key];
-      delete ratingUpdated[key];
-    }else if(newest===remoteChange && remoteRatings[key]){
-      ratings[key]=remoteRatings[key];
-      ratingUpdated[key]=remoteUpdated[key]||remoteFallback;
-      delete ratingDeleted[key];
-    }else if(ratings[key]){
-      delete ratingDeleted[key];
+      delete ratingCellUpdated[key];
+      ratingDeleted[key]=localDelete>=remoteDelete?ratingDeleted[key]:remoteDeleted[key];
+      continue;
     }
+
+    const merged=[0,0,0,0];
+    const mergedCellUpdated=[new Date(0).toISOString(),new Date(0).toISOString(),new Date(0).toISOString(),new Date(0).toISOString()];
+
+    for(let i=0;i<4;i++){
+      const localTime=asTime(localCells[i]);
+      const remoteTime=asTime(remoteCells[i]);
+
+      if(remoteTime>localTime){
+        merged[i]=Number(remoteValues[i]||0);
+        mergedCellUpdated[i]=remoteCells[i]||remoteFallback;
+      }else{
+        merged[i]=Number(localValues[i]||0);
+        mergedCellUpdated[i]=localCells[i]||new Date(0).toISOString();
+      }
+    }
+
+    ratings[key]=merged;
+    ratingCellUpdated[key]=mergedCellUpdated;
+    ratingUpdated[key]=mergedCellUpdated.reduce((latest,current)=>asTime(current)>asTime(latest)?current:latest,new Date(0).toISOString());
+    delete ratingDeleted[key];
   }
 
   if(remote?.bestScores){
@@ -150,9 +173,9 @@ function mergeRemotePayload(remote,rowUpdatedAt){
   if(remoteTime>localTime){
     if(remote.theme) setTheme(remote.theme,{sync:false});
     if(remote.preferences?.rankingView) state.rankingView=remote.preferences.rankingView;
-    localUpdatedAt=remoteFallback;
   }
 
+  localUpdatedAt=new Date(Math.max(localTime,remoteTime)).toISOString();
   persistLocalState();
 }
 async function fetchRemoteRow(){
@@ -253,7 +276,11 @@ async function initAuth(){
     setSyncStatus('Connexion au service indisponible');
   }
 }
-async function ensureCatalog(){for(const a of ALBUMS) await loadAlbumTracks(a)}
+async function loadAlbumTracks(album){
+  // Le catalogue local est la source de vérité. iTunes sert uniquement aux extraits audio.
+  return album?.tracks||[];
+}
+async function ensureCatalog(){return ALBUMS}
 function generatedQuiz(){
   const out=[];
   const albumTitles=ALBUMS.map(a=>a.title);
@@ -611,6 +638,7 @@ if(resetAllBtn){
     Object.keys(ratings).forEach(key=>{
       delete ratings[key];
       delete ratingUpdated[key];
+      delete ratingCellUpdated[key];
       ratingDeleted[key]=deletedAt;
     });
     save();
@@ -630,11 +658,15 @@ if(resetBtn){
       const key=ratingKey(album.id,index);
       delete ratings[key];
       delete ratingUpdated[key];
+      delete ratingCellUpdated[key];
       ratingDeleted[key]=deletedAt;
     });
-    Object.keys(ratings).filter(key=>key.startsWith(album.id+'|')).forEach(key=>{
+    Object.keys(ratings).filter(key=>
+      key.startsWith(album.id+'|') || key.startsWith(`track_${album.id}_`)
+    ).forEach(key=>{
       delete ratings[key];
       delete ratingUpdated[key];
+      delete ratingCellUpdated[key];
       ratingDeleted[key]=deletedAt;
     });
     save();
@@ -660,7 +692,10 @@ let b=e.target.closest('[data-rate]');if(b){
   let k=b.dataset.rate,c=+b.dataset.crit,v=+b.dataset.value;
   ratings[k]=ratings[k]||[0,0,0,0];
   ratings[k][c]=(v===1&&ratings[k][c]===1)?0:v;
-  ratingUpdated[k]=new Date().toISOString();
+  const changedAt=new Date().toISOString();
+  ratingUpdated[k]=changedAt;
+  ratingCellUpdated[k]=Array.isArray(ratingCellUpdated[k])?ratingCellUpdated[k]:[new Date(0).toISOString(),new Date(0).toISOString(),new Date(0).toISOString(),new Date(0).toISOString()];
+  ratingCellUpdated[k][c]=changedAt;
   delete ratingDeleted[k];
   save();
   render();
@@ -752,8 +787,12 @@ $('#loginForm').addEventListener('submit',async e=>{
 $('#forgotPassword').onclick=async()=>{const email=$('#loginEmail').value.trim();if(!email){$('#authMessage').textContent='Saisis d’abord ton adresse e-mail.';return}const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});$('#authMessage').textContent=error?'Impossible d’envoyer le lien.':'Un lien de réinitialisation a été envoyé.'};
 async function logoutUser(){await supabaseClient.auth.signOut();currentUser=null;closeMobileMenu();closeAccountMenu();$('#authSplash').hidden=false}
 async function syncUserNow(){
+  setSyncStatus('Synchronisation…');
   const ok=await syncBothWays();
-  if(ok) showSyncToast('Données synchronisées');
+  if(ok){
+    render();
+    showSyncToast('Données synchronisées');
+  }
 }
 
 function resetAllScores(){
@@ -800,7 +839,7 @@ supabaseClient.auth.onAuthStateChange((event,session)=>{
   if(accountEmail) accountEmail.textContent=currentUser.email||'Compte connecté';
   if(event==='SIGNED_IN' || event==='TOKEN_REFRESHED') refreshFromCloud();
 });
-canonicalizeRatingStore(ratings,ratingUpdated,ratingDeleted);
+canonicalizeRatingStore(ratings,ratingUpdated,ratingDeleted,ratingCellUpdated);
 persistLocalState();
 render();
 initAuth();
