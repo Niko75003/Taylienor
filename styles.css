@@ -309,3 +309,54 @@ var(--surface)}
   from{transform:scale(.92);filter:drop-shadow(0 0 2px #d0a82e)}
   to{transform:scale(1.08);filter:drop-shadow(0 0 15px #f1c94c)}
 }
+
+
+/* Version 2.8.2 — fermeture du popup plus accessible */
+.gold-thread-dialog{
+  position:relative;
+  overflow:visible;
+}
+.gold-thread-close{
+  position:absolute;
+  top:10px;
+  right:10px;
+  z-index:5;
+  float:none;
+  display:grid;
+  place-items:center;
+  width:48px;
+  height:48px;
+  min-width:48px;
+  min-height:48px;
+  margin:0;
+  padding:0;
+  border:1px solid #8f6e2655;
+  border-radius:50%;
+  background:#fffaf0ee;
+  color:#72571d;
+  font:700 30px/1 Inter,sans-serif;
+  cursor:pointer;
+  box-shadow:0 6px 20px #5a431522;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+.gold-thread-close:hover,
+.gold-thread-close:focus-visible{
+  background:#fff4cf;
+  transform:scale(1.06);
+  outline:3px solid #d4ad3c66;
+  outline-offset:2px;
+}
+@media(max-width:600px){
+  .gold-thread-dialog{
+    padding-top:62px;
+  }
+  .gold-thread-close{
+    top:8px;
+    right:8px;
+    width:52px;
+    height:52px;
+    min-width:52px;
+    min-height:52px;
+  }
+}

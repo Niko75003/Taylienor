@@ -253,3 +253,9 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - La reprise continue au même endroit et respecte la durée restante de l’extrait.
 - Le bouton « Classement général » est également disponible depuis chaque page album.
 - Easter egg : le cœur après « Aliénor » ouvre le message « One single thread of gold tied me to you. ».
+
+
+## Version 2.8.2
+- Bouton de fermeture du popup agrandi et repositionné.
+- Zone cliquable de 48 px sur ordinateur et 52 px sur mobile.
+- Amélioration du contraste, du focus clavier et de la réactivité tactile.
