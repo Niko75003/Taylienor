@@ -235,3 +235,14 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Les identifiants uniques sont désormais produits directement à partir de l’identifiant immuable de l’album et du rang canonique de la piste.
 - Le site démarre même si un navigateur possède encore une ancienne copie de `data.js`.
 - Nouveau cache-busting `2.7.1` pour forcer le rechargement des scripts.
+
+
+## Version 2.8
+- Stockage local strictement isolé par identifiant Supabase.
+- Migration unique des anciennes données locales vers le premier compte connecté après mise à jour.
+- Effacement de l’état en mémoire lors d’une déconnexion ou d’un changement de compte.
+- Nouveaux textes d’accueil pour Rank, Blindtest et Quiz.
+- Formats de partie : 1, 7, 13 ou 19 questions/morceaux.
+- Blindtest : compte à rebours de trois secondes, lecture automatique, replay et pause.
+- Navigation Rank : boutons « Tous les albums » et « Classement général ».
+- Compteur de progression du classement global.

@@ -18,35 +18,85 @@ const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
     storage:window.localStorage
   }
 });
-let currentUser=null,syncTimer=null;
-let bestScores=JSON.parse(localStorage.getItem('alienor-best-scores')||'{}');
+let currentUser=null,syncTimer=null,activeUserId=null;
+let bestScores={};
+let ratings={};
+let ratingUpdated={};
+let ratingCellUpdated={};
+let ratingDeleted={};
+let localUpdatedAt=new Date(0).toISOString();
 
-const state={route:'home',album:null,count:10,level:'normal',game:null,rankSort:'avg',rankDir:'desc',rankAlbum:'all',rankingView:'simple',openTrack:null};
-const ratings=JSON.parse(localStorage.getItem('alienor-ratings')||'{}');
-let ratingUpdated=JSON.parse(localStorage.getItem('alienor-rating-updated')||'{}');
-let ratingCellUpdated=JSON.parse(localStorage.getItem('alienor-rating-cell-updated')||'{}');
-let ratingDeleted=JSON.parse(localStorage.getItem('alienor-rating-deleted')||'{}');
-let localUpdatedAt=localStorage.getItem('alienor-local-updated-at')||new Date(0).toISOString();
+const state={route:'home',album:null,count:7,level:'normal',game:null,rankSort:'avg',rankDir:'desc',rankAlbum:'all',rankingView:'simple',openTrack:null};
 
-if(Object.keys(ratings).length && !Object.keys(ratingUpdated).length){
-  const legacyAt=new Date(0).toISOString();
-  Object.keys(ratings).forEach(key=>ratingUpdated[key]=legacyAt);
-  localStorage.setItem('alienor-rating-updated',JSON.stringify(ratingUpdated));
-}
-if(!Object.keys(ratingCellUpdated).length){
-  for(const [key,values] of Object.entries(ratings)){
-    const stamp=ratingUpdated[key]||new Date(0).toISOString();
-    ratingCellUpdated[key]=Array.from({length:4},(_,i)=>values?.[i]!==undefined?stamp:new Date(0).toISOString());
-  }
-  localStorage.setItem('alienor-rating-cell-updated',JSON.stringify(ratingCellUpdated));
-}
-const persistLocalState=()=>{
-  localStorage.setItem('alienor-ratings',JSON.stringify(ratings));
-  localStorage.setItem('alienor-rating-updated',JSON.stringify(ratingUpdated));
-  localStorage.setItem('alienor-rating-cell-updated',JSON.stringify(ratingCellUpdated));
-  localStorage.setItem('alienor-rating-deleted',JSON.stringify(ratingDeleted));
-  localStorage.setItem('alienor-local-updated-at',localUpdatedAt);
+const userKey=(name,userId=activeUserId)=>userId?`${name}:${userId}`:null;
+const readJSON=(key,fallback={})=>{
+  if(!key)return fallback;
+  try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback))}
+  catch(error){console.warn('Stockage local illisible',key,error);return fallback}
 };
+const resetUserMemory=()=>{
+  bestScores={};
+  ratings={};
+  ratingUpdated={};
+  ratingCellUpdated={};
+  ratingDeleted={};
+  localUpdatedAt=new Date(0).toISOString();
+  state.openTrack=null;
+  state.game?.audio?.pause?.();
+  state.game=null;
+};
+const migrateLegacyState=(userId)=>{
+  const marker=`alienor-user-storage-migrated:${userId}`;
+  if(localStorage.getItem(marker))return;
+  const hasScoped=localStorage.getItem(userKey('alienor-ratings',userId))!==null;
+  const legacyRatings=readJSON('alienor-ratings',{});
+  if(!hasScoped && Object.keys(legacyRatings).length){
+    const mappings=[
+      ['alienor-ratings',legacyRatings],
+      ['alienor-rating-updated',readJSON('alienor-rating-updated',{})],
+      ['alienor-rating-cell-updated',readJSON('alienor-rating-cell-updated',{})],
+      ['alienor-rating-deleted',readJSON('alienor-rating-deleted',{})],
+      ['alienor-best-scores',readJSON('alienor-best-scores',{})]
+    ];
+    for(const [name,value] of mappings)localStorage.setItem(userKey(name,userId),JSON.stringify(value));
+    const legacyUpdated=localStorage.getItem('alienor-local-updated-at');
+    if(legacyUpdated)localStorage.setItem(userKey('alienor-local-updated-at',userId),legacyUpdated);
+  }
+  localStorage.setItem(marker,new Date().toISOString());
+};
+const loadUserState=(userId)=>{
+  if(!userId)return;
+  migrateLegacyState(userId);
+  activeUserId=userId;
+  ratings=readJSON(userKey('alienor-ratings'),{});
+  ratingUpdated=readJSON(userKey('alienor-rating-updated'),{});
+  ratingCellUpdated=readJSON(userKey('alienor-rating-cell-updated'),{});
+  ratingDeleted=readJSON(userKey('alienor-rating-deleted'),{});
+  bestScores=readJSON(userKey('alienor-best-scores'),{});
+  localUpdatedAt=localStorage.getItem(userKey('alienor-local-updated-at'))||new Date(0).toISOString();
+
+  if(Object.keys(ratings).length && !Object.keys(ratingUpdated).length){
+    const legacyAt=new Date(0).toISOString();
+    Object.keys(ratings).forEach(key=>ratingUpdated[key]=legacyAt);
+  }
+  if(!Object.keys(ratingCellUpdated).length){
+    for(const [key,values] of Object.entries(ratings)){
+      const stamp=ratingUpdated[key]||new Date(0).toISOString();
+      ratingCellUpdated[key]=Array.from({length:4},(_,i)=>values?.[i]!==undefined?stamp:new Date(0).toISOString());
+    }
+  }
+  canonicalizeRatingStore(ratings,ratingUpdated,ratingDeleted,ratingCellUpdated);
+  persistLocalState();
+};
+function persistLocalState(){
+  if(!activeUserId)return;
+  localStorage.setItem(userKey('alienor-ratings'),JSON.stringify(ratings));
+  localStorage.setItem(userKey('alienor-rating-updated'),JSON.stringify(ratingUpdated));
+  localStorage.setItem(userKey('alienor-rating-cell-updated'),JSON.stringify(ratingCellUpdated));
+  localStorage.setItem(userKey('alienor-rating-deleted'),JSON.stringify(ratingDeleted));
+  localStorage.setItem(userKey('alienor-best-scores'),JSON.stringify(bestScores));
+  localStorage.setItem(userKey('alienor-local-updated-at'),localUpdatedAt);
+}
 const touchLocal=()=>{
   localUpdatedAt=new Date().toISOString();
   persistLocalState();
@@ -116,10 +166,10 @@ function localPayload(){
     theme:localStorage.getItem('alienor-theme')||'soft-summer',
     preferences:{rankingView:state.rankingView||'simple'},
     updatedAt:localUpdatedAt,
-    schemaVersion:4
+    schemaVersion:5
   };
 }
-function persistBestScores(){localStorage.setItem('alienor-best-scores',JSON.stringify(bestScores))}
+function persistBestScores(){if(activeUserId)localStorage.setItem(userKey('alienor-best-scores'),JSON.stringify(bestScores))}
 function setSyncStatus(text){const mobile=$('#syncStatus'),desktop=$('#desktopSyncStatus');if(mobile)mobile.textContent=text;if(desktop)desktop.textContent=text}
 function asTime(value){
   const t=Date.parse(value||'');
@@ -288,11 +338,14 @@ async function initAuth(){
     currentUser=session?.user||null;
 
     if(!currentUser){
+      activeUserId=null;
+      resetUserMemory();
       splash.hidden=false;
       setSyncStatus(response?.timeout?'Connexion au service indisponible':'Déconnecté');
       return;
     }
 
+    if(activeUserId!==currentUser.id)loadUserState(currentUser.id);
     splash.hidden=true;
     const accountEmail=$('#desktopAccountEmail');
     if(accountEmail) accountEmail.textContent=currentUser.email||'Compte connecté';
@@ -391,12 +444,21 @@ document.addEventListener('click',e=>{
 function back(target='home',label='Retour'){return `<div class="backbar"><button class="backbtn" data-route="${target}">← ${label}</button></div>`}
 function head(title,text,backTo='home',backLabel='Accueil'){return `${back(backTo,backLabel)}<section class="page-head"><h1>${title}</h1><p>${text}</p></section>`}
 function exitGame(){return `<div class="game-top-actions"><button class="backbtn" data-route="home">← Accueil</button><button class="exit-game" data-exit-game aria-label="Quitter et revenir à l’accueil" title="Quitter">×</button></div>`}
-function home(){return `<section class="hero"><h1><small>Welcome</small>Aliénor ♡</h1><p>Prête à plonger dans l’univers de Taylor ? Choisis ton expérience.</p><div class="module-grid">
-<button class="module" data-route="rank"><span>♡✦</span><h2>RANK</h2><p>Note et classe les morceaux selon quatre critères.</p><b>Commencer →</b></button>
-<button class="module" data-route="blindtest"><span>◉♫</span><h2>GUESS</h2><p>Écoute, devine le titre, l’album et la piste.</p><b>Jouer →</b></button>
-<button class="module" data-route="quiz"><span>?✧</span><h2>QUIZ</h2><p>Teste tes connaissances sur l’œuvre, la vie et les secrets de Taylor.</p><b>Jouer →</b></button>
+function home(){return `<section class="hero"><h1><small>Welcome</small>Aliénor ♡</h1><p>Bienvenue dans ta Swift Place.</p><div class="module-grid">
+<button class="module" data-route="rank"><span>♡✦</span><h2>RANK</h2><p>Mets à jour le classement de tes morceaux préférés.</p><b>Commencer →</b></button>
+<button class="module" data-route="blindtest"><span>◉♫</span><h2>GUESS</h2><p>Retrouve le titre, l’album et... la piste.</p><b>Jouer →</b></button>
+<button class="module" data-route="quiz"><span>?✧</span><h2>QUIZ</h2><p>Comme un devineuf mais avec une seule catégorie.</p><b>Jouer →</b></button>
 </div></section>`}
-function rank(){return head('Rank','Les Taylor’s Versions remplacent les versions originales lorsqu’elles existent.')+`<div style="margin-bottom:24px"><button class="primary" data-route="ranking">Voir le classement général</button></div><section class="album-grid">${ALBUMS.map(a=>`<button class="album" data-route="album" data-album="${a.id}" data-title="${a.title}" style="--a:${a.a};--b:${a.b}"><div class="cover"><span class="cover-label">${a.title}</span></div><div class="meta"><b>${a.title}</b><br><small>${a.year} · ${a.version}</small></div></button>`).join('')}</section>`}
+function rank(){
+  const totalTracks=ALBUMS.reduce((sum,a)=>sum+a.tracks.length,0);
+  const ratedTracks=ALBUMS.reduce((sum,a)=>sum+a.tracks.filter((_,i)=>ratings[ratingKey(a.id,i)]?.some(Boolean)).length,0);
+  return head('Rank','Les Taylor’s Versions remplacent les versions originales lorsqu’elles existent.')+`
+  <div class="rank-navigation">
+    <button class="primary active" data-route="rank">Tous les albums</button>
+    <button class="secondary" data-route="ranking">Classement général</button>
+    <span class="rank-progress">${ratedTracks} / ${totalTracks} morceaux notés</span>
+  </div>
+  <section class="album-grid">${ALBUMS.map(a=>`<button class="album" data-route="album" data-album="${a.id}" data-title="${a.title}" style="--a:${a.a};--b:${a.b}"><div class="cover"><span class="cover-label">${a.title}</span></div><div class="meta"><b>${a.title}</b><br><small>${a.year} · ${a.version}</small></div></button>`).join('')}</section>`}
 function dots(key,crit,val){return `<span class="dots">${[1,2,3,4,5].map(n=>`<button class="dot ${n<=val?'on':''}" data-rate="${key}" data-crit="${crit}" data-value="${n}" aria-label="${n}/5"></button>`).join('')}</span>`}
 function album(){
   const a=ALBUMS.find(x=>x.id===state.album)||ALBUMS[0];
@@ -450,7 +512,14 @@ function ranking(){
     return state.rankDir==='asc'?xv-yv:yv-xv;
   });
   const sortLabels={avg:'Note totale',reliability:'Reliability',lyrics:'Lyrics',voice:'Voice',production:'Production'};
-  return head('Le grand classement','Tous les morceaux évalués par Aliénor.')+`
+  const totalTracks=ALBUMS.reduce((sum,a)=>sum+a.tracks.length,0);
+  const ratedTracks=ALBUMS.reduce((sum,a)=>sum+a.tracks.filter((_,i)=>ratings[ratingKey(a.id,i)]?.some(Boolean)).length,0);
+  return head('Le grand classement','Tous tes morceaux évalués, réunis dans un seul classement.')+`
+  <div class="rank-navigation">
+    <button class="secondary" data-route="rank">Tous les albums</button>
+    <button class="primary active" data-route="ranking">Classement général</button>
+    <span class="rank-progress">${ratedTracks} / ${totalTracks} morceaux notés</span>
+  </div>
   <div class="ranking-view-switch" role="group" aria-label="Affichage du classement">
     <button class="${state.rankingView==='simple'?'active':''}" data-ranking-view="simple">Version simplifiée</button>
     <button class="${state.rankingView==='detailed'?'active':''}" data-ranking-view="detailed">Voir le détail des notes</button>
@@ -490,14 +559,14 @@ function ranking(){
     </div>
   </section>`
 }
-function setup(type){let isB=type==='blindtest';return `<div class="game-shell">${exitGame()}${head(isB?'Blindtest':'Quiz','')}<section class="panel setup"><div class="option"><h3>${isB?'Nombre de morceaux':'Nombre de questions'}</h3><div class="segments">${[1,5,10,20].map(n=>`<button class="${state.count===n?'on':''}" data-count="${n}">${n}</button>`).join('')}</div></div><div class="option"><h3>Niveau de difficulté</h3><div class="segments" style="grid-template-columns:repeat(3,1fr)">${[['easy','Facile'],['normal','Normal'],['hard','Difficile']].map(x=>`<button class="${state.level===x[0]?'on':''}" data-level="${x[0]}">${x[1]}</button>`).join('')}</div></div>${renderBestScore(type)}<p style="text-align:center"><button class="primary" data-start="${type}">Lancer ${isB?'le blindtest':'le quiz'} ▶</button></p></section></div>`}
+function setup(type){let isB=type==='blindtest';return `<div class="game-shell">${exitGame()}${head(isB?'Blindtest':'Quiz','')}<section class="panel setup"><div class="option"><h3>${isB?'Nombre de morceaux':'Nombre de questions'}</h3><div class="segments">${[1,7,13,19].map(n=>`<button class="${state.count===n?'on':''}" data-count="${n}">${n}</button>`).join('')}</div></div><div class="option"><h3>Niveau de difficulté</h3><div class="segments" style="grid-template-columns:repeat(3,1fr)">${[['easy','Facile'],['normal','Normal'],['hard','Difficile']].map(x=>`<button class="${state.level===x[0]?'on':''}" data-level="${x[0]}">${x[1]}</button>`).join('')}</div></div>${renderBestScore(type)}<p style="text-align:center"><button class="primary" data-start="${type}">Lancer ${isB?'le blindtest':'le quiz'} ▶</button></p></section></div>`}
 async function startQuiz(){
   app.innerHTML='<section class="panel game loading-state"><div class="loading-icon" aria-hidden="true"></div><h2>Préparation du quiz…</h2></section>';
   await ensureCatalog();
   let bank=[...QUIZ,...EXTRA_QUIZ,...generatedQuiz()];
   let shuffled=bank.sort(()=>Math.random()-.5);
   let q=shuffled.slice(0,Math.min(state.count,bank.length));
-  if(state.count>=5){
+  if(state.count>=7){
     const photos=bank.filter(item=>item.image);
     if(photos.length && !q.some(item=>item.image)) q[Math.floor(Math.random()*q.length)]=photos[Math.floor(Math.random()*photos.length)];
   }
@@ -552,26 +621,83 @@ async function startBlind(){
   app.innerHTML='<section class="panel game loading-state"><div class="loading-icon" aria-hidden="true"></div><h2>Préparation du blindtest…</h2></section>';
   await ensureCatalog();
   let items=allTracks().sort(()=>Math.random()-.5).slice(0,state.count);
-  state.game={type:'blindtest',items,i:0,score:0,audio:null,playing:false,feedback:null};
+  state.game={type:'blindtest',items,i:0,score:0,audio:null,playing:false,feedback:null,countdown:3,audioReady:false,autoplayBlocked:false};
   render();loadAudio()
 }
+function playBlindExcerpt({restart=true}={}){
+  const g=state.game;
+  if(!g?.audio)return;
+  if(restart)g.audio.currentTime=state.level==='hard'?8:state.level==='easy'?0:4;
+  const duration=state.level==='hard'?5000:state.level==='easy'?15000:10000;
+  clearTimeout(g.pauseTimer);
+  const promise=g.audio.play();
+  if(promise?.catch)promise.catch(()=>{
+    g.autoplayBlocked=true;
+    const status=document.querySelector('.audio-status');
+    if(status)status.textContent='Lecture automatique bloquée : appuie sur Rejouer.';
+    document.querySelector('.audio-controls')?.classList.add('needs-action');
+  });
+  g.pauseTimer=setTimeout(()=>g.audio?.pause(),duration);
+}
+function startBlindCountdown(){
+  const g=state.game;
+  if(!g?.audioReady)return;
+  clearInterval(g.countdownTimer);
+  g.countdown=3;
+  const box=document.querySelector('.blind-countdown');
+  if(box){box.hidden=false;box.textContent='3'}
+  g.countdownTimer=setInterval(()=>{
+    g.countdown--;
+    const current=document.querySelector('.blind-countdown');
+    if(g.countdown>0){
+      if(current)current.textContent=String(g.countdown);
+      return;
+    }
+    clearInterval(g.countdownTimer);
+    if(current){current.textContent='♫';setTimeout(()=>{current.hidden=true},500)}
+    playBlindExcerpt({restart:true});
+  },1000);
+}
 async function loadAudio(){
-  let g=state.game,item=g.items[g.i];
+  const g=state.game,item=g?.items?.[g.i];
+  if(!g||!item)return;
+  clearInterval(g.countdownTimer);
+  clearTimeout(g.pauseTimer);
+  g.audio?.pause?.();
+  g.audio=null;
+  g.audioReady=false;
+  g.autoplayBlocked=false;
   try{
-    let term=encodeURIComponent(`${item.title} Taylor Swift`);
-    let data=await fetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=8`).then(r=>r.json());
-    let hit=data.results.find(x=>x.artistName.toLowerCase().includes('taylor swift')&&x.previewUrl);
+    const term=encodeURIComponent(`${item.title} Taylor Swift`);
+    const data=await fetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=8`).then(r=>r.json());
+    const hit=data.results.find(x=>x.artistName?.toLowerCase().includes('taylor swift')&&x.previewUrl);
     if(hit){
       g.audio=new Audio(hit.previewUrl);
-      g.audio.addEventListener('play',()=>{g.playing=true;document.querySelector('.wave')?.classList.add('playing');document.querySelector('.play')?.classList.add('playing')});
-      const stop=()=>{g.playing=false;document.querySelector('.wave')?.classList.remove('playing');document.querySelector('.play')?.classList.remove('playing')};
-      g.audio.addEventListener('pause',stop);g.audio.addEventListener('ended',stop);
-      const playBtn=$('.play');if(playBtn){playBtn.disabled=false;playBtn.classList.add('ready')}
+      g.audio.preload='auto';
+      g.audio.addEventListener('play',()=>{
+        g.playing=true;
+        document.querySelector('.wave')?.classList.add('playing');
+      });
+      const stop=()=>{
+        g.playing=false;
+        document.querySelector('.wave')?.classList.remove('playing');
+      };
+      g.audio.addEventListener('pause',stop);
+      g.audio.addEventListener('ended',stop);
+      g.audioReady=true;
       document.querySelector('.audio-loading')?.remove();
+      const controls=document.querySelectorAll('[data-audio-action]');
+      controls.forEach(button=>button.disabled=false);
+      startBlindCountdown();
     }else{
-      const s=$('.audio-status');if(s)s.textContent='Extrait indisponible';
+      const s=document.querySelector('.audio-status');
+      if(s)s.textContent='Extrait indisponible';
     }
-  }catch(e){const s=$('.audio-status');if(s)s.textContent='Connexion audio indisponible'}
+  }catch(error){
+    console.error('Audio loading error',error);
+    const s=document.querySelector('.audio-status');
+    if(s)s.textContent='Connexion audio indisponible';
+  }
 }
 function blindGame(){
   let g=state.game;
@@ -585,9 +711,15 @@ function blindGame(){
   <span><b>1</b><small>numéro de piste</small></span>
 </div>
     <div class="progress"><span style="width:${g.i/g.items.length*100}%"></span></div>
-    <div class="wave"></div>
+    <div class="blind-audio-stage">
+      <div class="blind-countdown" aria-live="assertive" hidden>3</div>
+      <div class="wave"></div>
+    </div>
     <div class="audio-loading"><div class="loading-icon mini" aria-hidden="true"></div><p class="audio-status">Recherche de l’extrait…</p></div>
-    <p><button class="primary play" disabled><span class="play-arrow">▶</span> Écouter</button></p>
+    <div class="audio-controls">
+      <button class="primary" data-audio-action="replay" disabled>↻ Rejouer l’extrait</button>
+      <button class="secondary" data-audio-action="pause" disabled>Ⅱ Pause</button>
+    </div>
     <div class="answers"><input id="song" placeholder="Titre de la chanson"><input id="alb" placeholder="Album"><input id="track" placeholder="N° de piste"></div>
     <p><button class="primary" data-submit-blind>Valider</button></p><p>Score : ${g.score}</p>
   </section></div>`
@@ -731,12 +863,13 @@ let b=e.target.closest('[data-rate]');if(b){
   delete ratingDeleted[k];
   save();
   render();
-}if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();if(e.target.closest('.play')&&state.game.audio){
-  state.game.audio.currentTime=state.level==='hard'?8:state.level==='easy'?0:4;
-  state.game.audio.play();
+}if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();const audioAction=e.target.closest('[data-audio-action]')?.dataset.audioAction;
+if(audioAction==='replay'&&state.game?.audio)playBlindExcerpt({restart:true});
+if(audioAction==='pause'&&state.game?.audio){
   clearTimeout(state.game.pauseTimer);
-  state.game.pauseTimer=setTimeout(()=>state.game.audio.pause(),state.level==='hard'?5000:state.level==='easy'?15000:10000);
-}if(e.target.dataset.answer!==undefined){
+  state.game.audio.pause();
+}
+if(e.target.dataset.answer!==undefined){
   let g=state.game,q=g.items[g.i],chosen=+e.target.dataset.answer,correct=chosen===q.a;
   if(correct)g.score++;
   g.feedback={correct,correctAnswer:q.o[q.a]};
@@ -817,7 +950,17 @@ $('#loginForm').addEventListener('submit',async e=>{
   }
 });
 $('#forgotPassword').onclick=async()=>{const email=$('#loginEmail').value.trim();if(!email){$('#authMessage').textContent='Saisis d’abord ton adresse e-mail.';return}const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});$('#authMessage').textContent=error?'Impossible d’envoyer le lien.':'Un lien de réinitialisation a été envoyé.'};
-async function logoutUser(){await supabaseClient.auth.signOut();currentUser=null;closeMobileMenu();closeAccountMenu();$('#authSplash').hidden=false}
+async function logoutUser(){
+  persistLocalState();
+  await supabaseClient.auth.signOut();
+  currentUser=null;
+  activeUserId=null;
+  resetUserMemory();
+  closeMobileMenu();
+  closeAccountMenu();
+  $('#authSplash').hidden=false;
+  render();
+}
 async function syncUserNow(){
   setSyncStatus('Synchronisation…');
   const ok=await syncBothWays();
@@ -860,18 +1003,25 @@ setInterval(()=>{
 },30000);
 
 supabaseClient.auth.onAuthStateChange((event,session)=>{
-  currentUser=session?.user||null;
-  if(!currentUser){
+  const nextUser=session?.user||null;
+  if(!nextUser){
+    currentUser=null;
+    activeUserId=null;
+    resetUserMemory();
     setSyncStatus('Déconnecté');
+    const splash=$('#authSplash');
+    if(splash)splash.hidden=false;
+    render();
     return;
   }
+  currentUser=nextUser;
+  if(activeUserId!==currentUser.id)loadUserState(currentUser.id);
   const splash=$('#authSplash');
-  if(splash) splash.hidden=true;
+  if(splash)splash.hidden=true;
   const accountEmail=$('#desktopAccountEmail');
-  if(accountEmail) accountEmail.textContent=currentUser.email||'Compte connecté';
-  if(event==='SIGNED_IN' || event==='TOKEN_REFRESHED') refreshFromCloud();
+  if(accountEmail)accountEmail.textContent=currentUser.email||'Compte connecté';
+  render();
+  if(event==='SIGNED_IN' || event==='TOKEN_REFRESHED')refreshFromCloud();
 });
-canonicalizeRatingStore(ratings,ratingUpdated,ratingDeleted,ratingCellUpdated);
-persistLocalState();
 render();
 initAuth();
