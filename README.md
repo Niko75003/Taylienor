@@ -246,3 +246,10 @@ Les notes sont stockées avec `localStorage` dans le navigateur. Aucun compte Ap
 - Blindtest : compte à rebours de trois secondes, lecture automatique, replay et pause.
 - Navigation Rank : boutons « Tous les albums » et « Classement général ».
 - Compteur de progression du classement global.
+
+
+## Version finale 2.8.1
+- Le bouton Pause du blindtest devient « Reprendre » lorsque l’extrait est interrompu.
+- La reprise continue au même endroit et respecte la durée restante de l’extrait.
+- Le bouton « Classement général » est également disponible depuis chaque page album.
+- Easter egg : le cœur après « Aliénor » ouvre le message « One single thread of gold tied me to you. ».

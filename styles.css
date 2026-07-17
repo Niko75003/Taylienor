@@ -255,3 +255,57 @@ var(--surface)}
   .rank-progress{width:100%;margin-left:0;text-align:center}
   .rank-navigation .primary,.rank-navigation .secondary{flex:1}
 }
+
+
+/* Version finale 2.8.1 */
+.home-heart{
+  display:inline-grid;
+  place-items:center;
+  border:0;
+  padding:0 .08em;
+  margin:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  line-height:1;
+  cursor:pointer;
+  transition:transform .2s ease,filter .2s ease;
+}
+.home-heart:hover,.home-heart:focus-visible{
+  transform:scale(1.13) rotate(-5deg);
+  filter:drop-shadow(0 0 12px #f4d67a);
+  outline:none;
+}
+.gold-thread-dialog{
+  width:min(520px,90vw);
+  text-align:center;
+  padding:48px 34px 38px;
+  color:#5a4315;
+  border:1px solid #d9b95480;
+  background:
+    radial-gradient(circle at 50% 0%,#fff7ca 0,transparent 45%),
+    linear-gradient(145deg,#fffdf4,#f5e6aa);
+  box-shadow:0 30px 90px #37250866;
+}
+.gold-thread-dialog::backdrop{
+  background:#17100bbb;
+  backdrop-filter:blur(9px);
+}
+.gold-thread-dialog p{
+  margin:15px auto 4px;
+  max-width:390px;
+  font:clamp(25px,5vw,38px) Italiana,serif;
+  line-height:1.25;
+}
+.gold-thread-star{
+  font-size:32px;
+  color:#b58a16;
+  animation:goldThreadGlow 1.8s ease-in-out infinite alternate;
+}
+.gold-thread-close{
+  color:#72571d;
+}
+@keyframes goldThreadGlow{
+  from{transform:scale(.92);filter:drop-shadow(0 0 2px #d0a82e)}
+  to{transform:scale(1.08);filter:drop-shadow(0 0 15px #f1c94c)}
+}

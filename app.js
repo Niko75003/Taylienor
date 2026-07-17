@@ -444,7 +444,7 @@ document.addEventListener('click',e=>{
 function back(target='home',label='Retour'){return `<div class="backbar"><button class="backbtn" data-route="${target}">← ${label}</button></div>`}
 function head(title,text,backTo='home',backLabel='Accueil'){return `${back(backTo,backLabel)}<section class="page-head"><h1>${title}</h1><p>${text}</p></section>`}
 function exitGame(){return `<div class="game-top-actions"><button class="backbtn" data-route="home">← Accueil</button><button class="exit-game" data-exit-game aria-label="Quitter et revenir à l’accueil" title="Quitter">×</button></div>`}
-function home(){return `<section class="hero"><h1><small>Welcome</small>Aliénor ♡</h1><p>Bienvenue dans ta Swift Place.</p><div class="module-grid">
+function home(){return `<section class="hero"><h1><small>Welcome</small>Aliénor <button class="home-heart" data-easter-egg aria-label="Ouvrir le message secret" title="♡">♡</button></h1><p>Bienvenue dans ta Swift Place.</p><div class="module-grid">
 <button class="module" data-route="rank"><span>♡✦</span><h2>RANK</h2><p>Mets à jour le classement de tes morceaux préférés.</p><b>Commencer →</b></button>
 <button class="module" data-route="blindtest"><span>◉♫</span><h2>GUESS</h2><p>Retrouve le titre, l’album et... la piste.</p><b>Jouer →</b></button>
 <button class="module" data-route="quiz"><span>?✧</span><h2>QUIZ</h2><p>Comme un devineuf mais avec une seule catégorie.</p><b>Jouer →</b></button>
@@ -462,8 +462,15 @@ function rank(){
 function dots(key,crit,val){return `<span class="dots">${[1,2,3,4,5].map(n=>`<button class="dot ${n<=val?'on':''}" data-rate="${key}" data-crit="${crit}" data-value="${n}" aria-label="${n}/5"></button>`).join('')}</span>`}
 function album(){
   const a=ALBUMS.find(x=>x.id===state.album)||ALBUMS[0];
+  const totalTracks=ALBUMS.reduce((sum,album)=>sum+album.tracks.length,0);
+  const ratedTracks=ALBUMS.reduce((sum,album)=>sum+album.tracks.filter((_,i)=>ratings[ratingKey(album.id,i)]?.some(Boolean)).length,0);
   return head(a.title,`${a.year} · ${a.version}`,'rank','Tous les albums')+
-  `<section class="panel rating-layout">
+  `<div class="rank-navigation">
+    <button class="secondary" data-route="rank">Tous les albums</button>
+    <button class="primary" data-route="ranking">Classement général</button>
+    <span class="rank-progress">${ratedTracks} / ${totalTracks} morceaux notés</span>
+  </div>
+  <section class="panel rating-layout">
     <div>
       <div class="big-cover" data-title="${a.title}" style="--a:${a.a};--b:${a.b}">
         <span class="cover-label">${a.title}</span>
@@ -624,20 +631,50 @@ async function startBlind(){
   state.game={type:'blindtest',items,i:0,score:0,audio:null,playing:false,feedback:null,countdown:3,audioReady:false,autoplayBlocked:false};
   render();loadAudio()
 }
+function updatePauseButton(){
+  const button=document.querySelector('[data-audio-action="pause"]');
+  const g=state.game;
+  if(!button||!g?.audio)return;
+  button.textContent=g.audio.paused?'▶ Reprendre':'Ⅱ Pause';
+  button.setAttribute('aria-label',g.audio.paused?'Reprendre la lecture':'Mettre en pause');
+}
 function playBlindExcerpt({restart=true}={}){
   const g=state.game;
   if(!g?.audio)return;
-  if(restart)g.audio.currentTime=state.level==='hard'?8:state.level==='easy'?0:4;
-  const duration=state.level==='hard'?5000:state.level==='easy'?15000:10000;
+
+  const startAt=state.level==='hard'?8:state.level==='easy'?0:4;
+  const durationSeconds=state.level==='hard'?5:state.level==='easy'?15:10;
+
+  if(restart){
+    g.audio.currentTime=startAt;
+    g.excerptEnd=startAt+durationSeconds;
+  }else if(!g.excerptEnd){
+    g.excerptEnd=g.audio.currentTime+durationSeconds;
+  }
+
   clearTimeout(g.pauseTimer);
+  const remaining=Math.max(0,(g.excerptEnd-g.audio.currentTime)*1000);
+  if(remaining<=0){
+    g.audio.currentTime=startAt;
+    g.excerptEnd=startAt+durationSeconds;
+  }
+
   const promise=g.audio.play();
+  updatePauseButton();
+
   if(promise?.catch)promise.catch(()=>{
     g.autoplayBlocked=true;
     const status=document.querySelector('.audio-status');
     if(status)status.textContent='Lecture automatique bloquée : appuie sur Rejouer.';
     document.querySelector('.audio-controls')?.classList.add('needs-action');
+    updatePauseButton();
   });
-  g.pauseTimer=setTimeout(()=>g.audio?.pause(),duration);
+
+  const finalRemaining=Math.max(0,(g.excerptEnd-g.audio.currentTime)*1000);
+  g.pauseTimer=setTimeout(()=>{
+    g.audio?.pause();
+    updatePauseButton();
+  },finalRemaining);
 }
 function startBlindCountdown(){
   const g=state.game;
@@ -677,10 +714,12 @@ async function loadAudio(){
       g.audio.addEventListener('play',()=>{
         g.playing=true;
         document.querySelector('.wave')?.classList.add('playing');
+        updatePauseButton();
       });
       const stop=()=>{
         g.playing=false;
         document.querySelector('.wave')?.classList.remove('playing');
+        updatePauseButton();
       };
       g.audio.addEventListener('pause',stop);
       g.audio.addEventListener('ended',stop);
@@ -774,6 +813,15 @@ async function hydrateArtwork(){
 
 function render(){if(state.game&&state.route===state.game.type)app.innerHTML=state.game.type==='quiz'?quizGame():blindGame();else app.innerHTML=state.route==='home'?home():state.route==='rank'?rank():state.route==='album'?album():state.route==='ranking'?ranking():setup(state.route);app.focus();hydrateArtwork()}
 document.addEventListener('click',e=>{
+if(e.target.closest('[data-easter-egg]')){
+  const dialog=document.querySelector('#goldThreadDialog');
+  if(dialog?.showModal)dialog.showModal();
+  return;
+}
+if(e.target.closest('[data-close-gold-thread]')){
+  document.querySelector('#goldThreadDialog')?.close();
+  return;
+}
 if(e.target.closest('[data-result-home]')){state.game?.audio?.pause();state.game=null;go('home');return}
 const replayBtn=e.target.closest('[data-replay]');
 if(replayBtn){
@@ -866,8 +914,13 @@ let b=e.target.closest('[data-rate]');if(b){
 }if(e.target.dataset.count){state.count=+e.target.dataset.count;render()}if(e.target.dataset.level){state.level=e.target.dataset.level;render()}if(e.target.dataset.start==='quiz')startQuiz();if(e.target.dataset.start==='blindtest')startBlind();const audioAction=e.target.closest('[data-audio-action]')?.dataset.audioAction;
 if(audioAction==='replay'&&state.game?.audio)playBlindExcerpt({restart:true});
 if(audioAction==='pause'&&state.game?.audio){
-  clearTimeout(state.game.pauseTimer);
-  state.game.audio.pause();
+  if(state.game.audio.paused){
+    playBlindExcerpt({restart:false});
+  }else{
+    clearTimeout(state.game.pauseTimer);
+    state.game.audio.pause();
+    updatePauseButton();
+  }
 }
 if(e.target.dataset.answer!==undefined){
   let g=state.game,q=g.items[g.i],chosen=+e.target.dataset.answer,correct=chosen===q.a;
@@ -1025,3 +1078,8 @@ supabaseClient.auth.onAuthStateChange((event,session)=>{
 });
 render();
 initAuth();
+
+const goldThreadDialog=document.querySelector('#goldThreadDialog');
+goldThreadDialog?.addEventListener('click',event=>{
+  if(event.target===goldThreadDialog)goldThreadDialog.close();
+});
